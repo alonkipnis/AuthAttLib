@@ -1,6 +1,9 @@
 ## datasets:
 *.csv
 
+__pycache__
+.ipynb_checkpoints
+
 ## Core latex/pdflatex auxiliary files:
 *.aux
 *.lof

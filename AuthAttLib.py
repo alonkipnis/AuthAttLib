@@ -11,7 +11,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 import warnings
 
-
 def two_sample_chi_square(c1, c2) :
     """returns the Chi-Square score of the two samples c1 and c2 (representing counts)
     (c1 and c2 are assumed to be numpy arrays of equal length)"""
@@ -19,7 +18,6 @@ def two_sample_chi_square(c1, c2) :
     T2 = c2.sum()
     C = (np.sqrt(T2/T1) * c1 / T1 - np.sqrt(T1/T2) * c2 / T2 ) ** 2 / (c1/T1 + c2/T2 + 1e-20)
     return np.sum(C)
-
 
 def cosine_sim(c1, c2) :
     """
@@ -149,22 +147,6 @@ def text_df_to_dtc_df(data, ngram_range = (1,1), vocab = [], vocab_size = 500) :
                                                      ignore_index = True )
     return df
 
-def len_of_sentences(text, low_thresh = 4, high_thresh = 30) :
-    # numebr of long sentences
-    len_of_sent1 = pd.DataFrame(
-        pd.DataFrame({'txt' : text.split('.')}).txt.str.split()
-        )['txt'].apply(lambda x: len(x)).values
-    
-    high_thresh = 30
-    df = pd.DataFrame()
-    n1 = (len_of_sent1 > high_thresh).sum()
-    df = df.append({'feature' : 'sentences_exceeding_{}'.format(high_thresh),
-                                                 'n' : n1}, ignore_index=True)
-    
-    small_thresh = 6
-    n1 = (len_of_sent1 <= low_thresh).sum() - (len_of_sent1 <= 1).sum()
-    df = df.append({'feature' : 'sentences_smaller_than_{}'.format(low_thresh), 'n' : n1}, ignore_index=True)
-    return df
 
 def to_docTermCounts(lo_texts, vocab = [], max_features = 500,
                                                      ngram_range = (1,1)) :
@@ -400,6 +382,12 @@ class DocTermTable(object) :
         return pv_list
     
     def get_doc_as_table(self, doc_id) :
+        """
+        Returns a single row in the doc-term-matrix as a new DocTermTable 
+        object. 
+
+        'doc_id' is the rwo identifier 
+        """
         dtm = self._dtm[self._doc_names[doc_id],:]
         new_table = DocTermTable(dtm,
                                  feature_names = self._feature_names,
@@ -408,6 +396,10 @@ class DocTermTable(object) :
         return new_table
 
     def get_ChiSquare(self, dtbl) :
+        """
+        Returns the ChiSquare score of another DocTermTable object 
+        'dtbl' with respect to the current one
+        """
         if dtbl._feature_names != self._feature_names :
             print("Warning: features of 'dtbl' do not match object. Changing dtbl accordingly. ")
             #Warning for changing the test object
@@ -416,6 +408,10 @@ class DocTermTable(object) :
         return two_sample_chi_square(self._counts,dtbl._counts)
 
     def get_CosineSim(self, dtbl) :
+        """
+        Returns the cosine similarity of another DocTermTable object 
+        'dtbl' with respect to the current one
+        """
         if dtbl._feature_names != self._feature_names :
             print("Warning: features of 'dtbl' do not match object. Changing dtbl accordingly. ")
             #Warning for changing the test object
@@ -484,22 +480,24 @@ class AuthorshipAttributionMultiText(object) :
             #modification: use different vocabulary for each author
             data_auth = self._data[self._data.author == auth]
             #vocab = frequent_words_tfidf(lo_texts, vocab_size)
-            print("\t AuthorModel: Creating model for " +\
-                  "{} using {} documents and {} features..."\
-                  .format(auth,len(data_auth),len(self._vocab)))
+            print("\t Creating author-model for {}")
+                  .format(auth)
             
             self._AuthorModel[auth] = self.to_docTermTable(list(data_auth.text),
                                       document_names = list(data_auth.doc_id))
-            print("\t found {} relevant tokens"\
-                .format(self._AuthorModel[auth]._counts.sum()))
-                    
+            print("\t\tfound {} documents, {} features, and {} relevant tokens")\
+            .format(len(data_auth),len(self._vocab),
+                self._AuthorModel[auth]._counts.sum())
+
     def predict(self, X, method = 'max_HC', unk_thresh = 1e6, LOO = False) :
         """
-            Attribute text X with one of the authors or '<UNK>'
-            Use 
-
-            Inputs 
-
+            Attribute text X with one of the authors or '<UNK>'. 
+            'unk_thresh' is the minimal HC score below which the text is 
+            attributed to one of the authors in the model and not assigned
+            the label '<UNK>'. 
+            
+            Currently only 'max_HC' and 'rank' prediction methods are supported
+            
         """
         
         if len(self._AuthorModel) == 0 :

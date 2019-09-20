@@ -1,0 +1,6 @@
+Library to facilitate HC-based test to discriminate word frequency tables
+and attribute authorship. 
+
+
+See the example in 'AuthorshipAttribution_example.ipynb' for usage in
+authorship attribution challenges. 

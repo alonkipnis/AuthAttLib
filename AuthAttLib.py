@@ -480,14 +480,13 @@ class AuthorshipAttributionMultiText(object) :
             #modification: use different vocabulary for each author
             data_auth = self._data[self._data.author == auth]
             #vocab = frequent_words_tfidf(lo_texts, vocab_size)
-            print("\t Creating author-model for {}")
-                  .format(auth)
+            print("\t Creating author-model for {}".format(auth))
             
             self._AuthorModel[auth] = self.to_docTermTable(list(data_auth.text),
                                       document_names = list(data_auth.doc_id))
-            print("\t\tfound {} documents, {} features, and {} relevant tokens")\
+            print("\t\tfound {} documents, {} features, and {} relevant tokens"\
             .format(len(data_auth),len(self._vocab),
-                self._AuthorModel[auth]._counts.sum())
+                self._AuthorModel[auth]._counts.sum()))
 
     def predict(self, X, method = 'max_HC', unk_thresh = 1e6, LOO = False) :
         """
@@ -497,7 +496,7 @@ class AuthorshipAttributionMultiText(object) :
             the label '<UNK>'. 
             
             Currently only 'max_HC' and 'rank' prediction methods are supported
-            
+
         """
         
         if len(self._AuthorModel) == 0 :

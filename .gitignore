@@ -1,3 +1,6 @@
+## datasets:
+*.csv
+
 ## Core latex/pdflatex auxiliary files:
 *.aux
 *.lof

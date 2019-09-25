@@ -9,7 +9,6 @@ from HC_aux import hc_vals, two_counts_pvals
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-import warnings
 
 
 def two_sample_chi_square(c1, c2):
@@ -367,7 +366,8 @@ class DocTermTable(object):
 
         if dtbl._feature_names != self._feature_names:
             print(
-                "Warning: features of 'dtbl' do not match object. Changing dtbl accordingly. "
+                "Warning: features of 'dtbl' do not match object",
+                " Changing dtbl accordingly. "
             )
             #Warning for changing the test object
             dtbl.change_vocabulary(self._feature_names)
@@ -410,7 +410,7 @@ class DocTermTable(object):
         self._dtm = new_dtm
         self._feature_names = new_vocabulary
 
-        self._compute_internal_stat()
+        self.__compute_internal_stat()
 
     def __per_doc_Pvals_LOO(self, dtm1):
         pv_list = []
@@ -539,12 +539,13 @@ class AuthorshipAttributionMulti(object):
         lo_authors = pd.unique(self._data.author)
         for auth in lo_authors:
             data_auth = self._data[self._data.author == auth]
-            print("\t Creating author-model for {}".format(auth))
+            print("\t Creating author-model for {} using {} features"\
+                .format(auth, len(self._vocab)))
 
             self._AuthorModel[auth] = self.to_docTermTable(
                 list(data_auth.text), document_names=list(data_auth.doc_id))
-            print("\t\tfound {} documents, {} features, and {} relevant tokens"\
-            .format(len(data_auth),len(self._vocab),
+            print("\t\tfound {} documents and {} relevant tokens"\
+            .format(len(data_auth),
                 self._AuthorModel[auth]._counts.sum()))
 
         #self.compute_author_models()
@@ -572,23 +573,22 @@ class AuthorshipAttributionMulti(object):
                             stbl=self._stbl)
 
     def re_compute_author_models(self):
-        """ compute author models after a change in vocab 
+        """ compute author models after a change in vocab """
 
-        Todo:
-            remove dependency in self._data
-            after that remove attribute self._data
-        """
+        for auth in self._AuthorModel:
+            am = self._AuthorModel[auth]
+            am.change_vocabulary(self._vocab)
+            print("Changed vocabulary for {}. Found {} relevant tokens"\
+                .format(auth, am._counts.sum()))
+            # data_auth = self._data[self._data.author == auth]
 
-        lo_authors = pd.unique(self._data.author)
-        for auth in lo_authors:
-            data_auth = self._data[self._data.author == auth]
-            print("\t Creating author-model for {}".format(auth))
+            # print("\t Creating author-model for {}".format(auth))
 
-            self._AuthorModel[auth] = self.to_docTermTable(
-                list(data_auth.text), document_names=list(data_auth.doc_id))
-            print("\t\tfound {} documents, {} features, and {} relevant tokens"\
-            .format(len(data_auth),len(self._vocab),
-                self._AuthorModel[auth]._counts.sum()))
+            # self._AuthorModel[auth] = self.to_docTermTable(
+            #     list(data_auth.text), document_names=list(data_auth.doc_id))
+            # print("\t\tfound {} documents, {} features, and {} relevant tokens"\
+            # .format(len(data_auth),len(self._vocab),
+            #     self._AuthorModel[auth]._counts.sum()))
 
     def predict(self, X, method='HC', unk_thresh=1e6, LOO=False):
         """
@@ -609,7 +609,7 @@ class AuthorshipAttributionMulti(object):
             marg -- ratio of second smallest score to smallest scroe
 
         Note:
-            Currently methods 'min HC', 'min rank' and 'min cosine'
+            Currently scores 'HC', 'rank' and 'cosine'
             are supported. 
         """
 
@@ -634,10 +634,12 @@ class AuthorshipAttributionMulti(object):
             elif method == 'cosine':
                 score = cosine
 
-            if score < min_score:
+            if score < min_score: # find new minimum
                 margin = min_score / score
                 min_score = score
                 cand = auth
+            elif score / min_score < margin : # make sure to track the margin
+                margin = score / min_score
         return cand, margin
 
     def internal_stats_corpus(self):
@@ -657,14 +659,13 @@ class AuthorshipAttributionMulti(object):
                     documents within the corpus.
         """
 
-        from tqdm import tqdm
-
-        # entire corpus
+        
         df = pd.DataFrame()
-        for auth0 in tqdm(self._AuthorModel):
+
+        for auth0 in tqdm(self._AuthorModel): # go over all corpora
             md0 = self._AuthorModel[auth0]
-            for auth1 in self._AuthorModel:
-                if auth0 < auth1:
+            for auth1 in self._AuthorModel:  # go over all corpora
+                if auth0 < auth1:            # consider each pair only once
                     md1 = self._AuthorModel[auth1]
                     HC, rank, feat = md0.get_HC_rank_features(md1)
                     chisq = md0.get_ChiSquare(md1)
@@ -711,10 +712,6 @@ class AuthorshipAttributionMulti(object):
             within the corpus.
         """
 
-        # cross HC scores, rank, and features
-        from tqdm import tqdm
-
-        # individual documents
         df = pd.DataFrame()
 
         if lo_authors == []:

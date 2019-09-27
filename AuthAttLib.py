@@ -493,10 +493,6 @@ class AuthorshipAttributionMulti(object):
         words_to_ignore -- tell tokenizer to ignore words in
                            this list.
 
-    Todo:
-        remove dependency in self._data by implementing new
-        re_compute_author_models()
-        after that remove attribute self._data
     """
     def __init__(self,
                  data,
@@ -521,13 +517,12 @@ class AuthorshipAttributionMulti(object):
 
         self._AuthorModel = {}  #:  list of DocTermTable objects, one for
         #: each author.
-        self._data = data  #: the entire dataset for the model.
         self._vocab = vocab  #: joint vocabulary for the model.
         self._ngram_range = ngram_range  #: the n-gram range of text
         #: in the model.
         self._stbl = stbl  #:  type of HC statistic to use.
 
-        if len(self._vocab) == 0:  #common vocabulary
+        if self._vocab == []:  #common vocabulary
             vocab = n_most_frequent_words(list(data.text),
                                           n=vocab_size,
                                           words_to_ignore=words_to_ignore,
@@ -536,9 +531,9 @@ class AuthorshipAttributionMulti(object):
 
         #compute author-models
 
-        lo_authors = pd.unique(self._data.author)
+        lo_authors = pd.unique(data.author)
         for auth in lo_authors:
-            data_auth = self._data[self._data.author == auth]
+            data_auth = data[data.author == auth]
             print("\t Creating author-model for {} using {} features"\
                 .format(auth, len(self._vocab)))
 
@@ -580,15 +575,6 @@ class AuthorshipAttributionMulti(object):
             am.change_vocabulary(self._vocab)
             print("Changed vocabulary for {}. Found {} relevant tokens"\
                 .format(auth, am._counts.sum()))
-            # data_auth = self._data[self._data.author == auth]
-
-            # print("\t Creating author-model for {}".format(auth))
-
-            # self._AuthorModel[auth] = self.to_docTermTable(
-            #     list(data_auth.text), document_names=list(data_auth.doc_id))
-            # print("\t\tfound {} documents, {} features, and {} relevant tokens"\
-            # .format(len(data_auth),len(self._vocab),
-            #     self._AuthorModel[auth]._counts.sum()))
 
     def predict(self, X, method='HC', unk_thresh=1e6, LOO=False):
         """

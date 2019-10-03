@@ -1,11 +1,9 @@
 import numpy as np
-
 import scipy
 from scipy.sparse import vstack
-
 from HC_aux import hc_vals, two_counts_pvals
-from aux_functions import *
 
+from aux_functions import *
 
 def change_dtm_dictionary(dtm, old_vocab, new_vocab):
     """

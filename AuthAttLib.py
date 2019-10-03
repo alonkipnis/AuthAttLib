@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 from tqdm import *
 
+from aux_functions import to_docTermCounts, n_most_frequent_words
+
+from DocTermTable import DocTermTable
+
 class AuthorshipAttributionMulti(object):
     """
     model for text classification using word frequency data and HC-based 

@@ -12,16 +12,15 @@ import re
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-
 def two_sample_chi_square(c1, c2):
     """returns the Chi-Square score of the two samples c1 and c2
      (representing counts). Null cells are ignored. 
 
     Args: 
-     c1, c2  -- two arrays of counts of equal lengths
+     c1, c2  -- two arrays of integers of equal length
     
     Returns:
-        chisq -- centralized chi-squares score (score - dof)
+        chisq -- centralized chi-square score (score - dof)
         pval -- p-value
     """
     

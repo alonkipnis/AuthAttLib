@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from tqdm import *
 
-from aux_functions import to_docTermCounts, n_most_frequent_words
+from utils import to_docTermCounts, n_most_frequent_words
 
 from DocTermTable import DocTermTable
 
@@ -51,7 +51,7 @@ class AuthorshipAttributionMulti(object):
         #: in the model.
         self._stbl = stbl  #:  type of HC statistic to use.
 
-        if self._vocab == []:  #common vocabulary
+        if len(self._vocab) == 0:  #common vocabulary
             vocab = n_most_frequent_words(list(data.text),
                                           n=vocab_size,
                                           words_to_ignore=words_to_ignore,
@@ -59,7 +59,6 @@ class AuthorshipAttributionMulti(object):
         self._vocab = vocab
 
         #compute author-models
-
         lo_authors = pd.unique(data.author)
         for auth in lo_authors:
             data_auth = data[data.author == auth]
@@ -67,7 +66,9 @@ class AuthorshipAttributionMulti(object):
                 .format(auth, len(self._vocab)))
 
             self._AuthorModel[auth] = self.to_docTermTable(
-                list(data_auth.text), document_names=list(data_auth.doc_id))
+                                list(data_auth.text),
+                                document_names=list(data_auth.doc_id)
+                                )
             print("\t\tfound {} documents and {} relevant tokens"\
             .format(len(data_auth),
                 self._AuthorModel[auth]._counts.sum()))
@@ -105,19 +106,21 @@ class AuthorshipAttributionMulti(object):
             print("Changing vocabulary for {}. Found {} relevant tokens"\
                 .format(auth, am._counts.sum()))
 
-    def predict(self, X, method='HC', unk_thresh=1e6, LOO=False):
+    def predict(self, x, method='HC', features_to_mask = [],
+                 unk_thresh=1e6, LOO=False):
         """
-        Attribute text X with one of the authors or '<UNK>'. 
+        Attribute text x with one of the authors or '<UNK>'. 
 
         Args:
-        X -- list of texts representing the test document (or corpus)
+            x -- string representing the test document 
             method -- designate which score to use
             unk_thresh -- minimal score below which the text is 
             attributed to one of the authors in the model and not assigned
             the label '<UNK>'.
-        LOO -- indicates whether to compute rank in a leave-of-out mode
+            LOO -- indicates whether to compute rank in a leave-of-out mode
             It leads to more accurate rank-based testing but require more 
             computations. 
+            features_to_mask -- mask these features from HC test. 
 
         Returns:
             pred -- one of the lo_authors or '<UNK>'
@@ -136,11 +139,16 @@ class AuthorshipAttributionMulti(object):
         min_score = unk_thresh
         margin = unk_thresh
 
-        Xdtb = self.to_docTermTable(X)
+        Xdtb = self.to_docTermTable([x])
+
+        if mask_features :
+            _, _, disc_features = all_authors.get_HC_rank_features(Xdtb)
 
         for i, auth in enumerate(self._AuthorModel):
             am = self._AuthorModel[auth]
-            score, rank, feat = am.get_HC_rank_features(Xdtb, LOO=LOO)
+            score, rank, feat = am.get_HC_rank_features(Xdtb, 
+                                    features_to_mask = features_to_mask,
+                                    LOO=LOO)
             chisq, chisq_pval = am.get_ChiSquare(Xdtb)
             cosine = am.get_CosineSim(Xdtb)
 
@@ -181,10 +189,10 @@ class AuthorshipAttributionMulti(object):
         
         df = pd.DataFrame()
 
-        for auth0 in tqdm(self._AuthorModel): # go over all corpora
+        for auth0 in tqdm(self._AuthorModel): # go over all authors
             md0 = self._AuthorModel[auth0]
             for auth1 in self._AuthorModel:  # go over all corpora
-                if auth0 < auth1:            # consider each pair only once
+                if auth0 < auth1:       # test each pair only once
                     md1 = self._AuthorModel[auth1]
                     HC, rank, feat = md0.get_HC_rank_features(md1)
                     chisq, chisq_pval = md0.get_ChiSquare(md1)
@@ -197,8 +205,9 @@ class AuthorshipAttributionMulti(object):
                             'chisq': chisq,
                             'chisq_pval' : chisq_pval,
                             'cosine': cosine,
-                            'no_docs': len(md1.get_document_names()),
-                            'no_tokens': md1._counts.sum(),
+                            'no_docs (author)': len(md1.get_document_names()),
+                            'no_docs (wrt_author)': len(md0.get_document_names()),
+                            'no_tokens (author)': md1._counts.sum(),
                             'feat': list(feat)
                         },
                         ignore_index=True)
@@ -234,7 +243,8 @@ class AuthorshipAttributionMulti(object):
 
         df = pd.DataFrame()
 
-        if lo_authors == []:
+        if len(lo_authors) == 0:
+            # evaluate with resepct to all authors in the model
             lo_authors = self._AuthorModel
 
         for auth0 in tqdm(lo_authors):
@@ -244,15 +254,18 @@ class AuthorshipAttributionMulti(object):
                 lo_docs = md1.get_document_names()
                 for dn in lo_docs:
                     dtbl = md1.get_doc_as_table(dn)
-                    chisq, chisq_pval = md0.get_ChiSquare(dtbl)
-                    cosine = md0.get_CosineSim(dtbl)
                     if auth0 == auth1:
-                        HC, rank, feat = md0.get_HC_rank_features(dtbl,
-                                                                  LOO=LOO,
-                                                                  within=True)
+                        HC, rank, feat = md0.get_HC_rank_features(
+                            dtbl,LOO=LOO,within=True
+                            )
+                        chisq, chisq_pval = md0.get_ChiSquare(dtbl,
+                                                         within=True)
+                        cosine = md0.get_CosineSim(dtbl, within=True)
                     else:
-                        HC, rank, feat = md0.get_HC_rank_features(dtbl,
-                                                                  LOO=LOO)
+                        HC, rank, feat = md0.get_HC_rank_features(
+                            dtbl, LOO=LOO)
+                        chisq, chisq_pval = md0.get_ChiSquare(dtbl)
+                        cosine = md0.get_CosineSim(dtbl)
                     df = df.append(
                         {
                             'doc_id': dn,
@@ -294,7 +307,7 @@ class AuthorshipAttributionMulti(object):
                     within the corpus.
         """
         # provides statiscs on decision wrt to test sample text
-        xdtb = self.to_docTermTable(x)
+        xdtb = self.to_docTermTable([x])
 
         df = pd.DataFrame()
         for auth in self._AuthorModel:
@@ -317,19 +330,55 @@ class AuthorshipAttributionMulti(object):
                 ignore_index=True)
         return df
 
-    def predict_stats_list(self, X, document_names=[], LOO=False):
+    def stats_list(self, data, lo_authors=[], LOO=False):
         """
-            Same as predict_stats but X represents a list of documents.
-            Each document in X is tested seperately.
+        Same as internal_stats but for a list of documents represented
+        by data
+
+        Arguments:
+            data -- list of documents with columns: doc_id|author|text
+        Returns:
+            dataframe with rows: 
+            doc_id|author|HC|ChiSq|cosine|rank|wrt_author
+
+            doc_id -- the document identifyer.
+            wrt_author -- author of the corpus against which the
+                         document is tested.
+            HC, ChiSq, cosine -- HC score, Chi-Square score, and cosine
+                                 similarity, respectively, between the 
+                                 document and the corpus.
+            rank -- the rank of the HC score compared to other documents 
+                    within the corpus.
         """
-        res = pd.DataFrame()
-        if document_names == []:
-            document_names = ["doc" + str(i + 1) for i in list(range(len(X)))]
-        for j, x in enumerate(X):
-            df = self.predict_stats(x)
-            df.loc[:, 'doc_id'] = document_names[j]
-            res = res.append(df, ignore_index=True)
-        return res
+
+        df = pd.DataFrame()
+
+        if len(lo_authors) == 0:
+            # evaluate with resepct to all authors in the model
+            lo_authors = self._AuthorModel
+
+        for auth0 in tqdm(lo_authors):
+            md0 = self._AuthorModel[auth0]
+            for r in data.iterrows() :
+                dtbl =  self.to_docTermTable([r[1].text])
+                chisq, chisq_pval = md0.get_ChiSquare(dtbl)
+                cosine = md0.get_CosineSim(dtbl)
+                HC, rank, feat = md0.get_HC_rank_features(dtbl,
+                                                        LOO=LOO)
+                df = df.append(
+                    {
+                        'doc_id': r[1].doc_id,
+                        'author': r[1].author,
+                        'wrt_author': auth0,
+                        'HC': HC,
+                        'chisq': chisq,
+                        'chisq_pval' : chisq_pval,
+                        'cosine': cosine,
+                        'rank': rank,
+                        'feat': list(feat)
+                    },
+                    ignore_index=True)
+        return df
 
     def reduce_features(self, new_feature_set):
         """

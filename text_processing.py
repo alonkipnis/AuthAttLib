@@ -41,3 +41,26 @@ def remove_hexa_symbols(text) :
 def remove_CR_LF(text) :
     #replace with a space
     return re.sub("\\\\(n|r)"," ",text)
+
+def preprocess_text(text, stem = True, clean_names = True,
+               clean_html_tags = True, clean_digits = True
+               ) : 
+    
+    text_st = text
+    
+    if clean_html_tags : 
+        text_st = html_to_text(text_st)
+    
+    if stem :
+        text_st = stem_text(text_st)
+        
+    if clean_names :
+        text_st = remove_proper_names(text_st)
+        #lo_proper_names = find_capitalized_words(text_st)
+        #text_st = " ".join(w for w in text_st.split() if w not in lo_proper_names)
+        
+    if clean_digits :
+        text_st = remove_digits(text_st)
+    
+    return text_st
+

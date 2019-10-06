@@ -3,7 +3,7 @@ import scipy
 from scipy.sparse import vstack
 from HC_aux import hc_vals, two_counts_pvals
 
-from aux_functions import *
+from utils import *
 
 def change_dtm_dictionary(dtm, old_vocab, new_vocab):
     """
@@ -87,7 +87,9 @@ class DocTermTable(object):
 
         return pv_list
 
-    def get_HC_rank_features(self, dtbl, LOO=False, within=False, stbl=None):
+    def get_HC_rank_features(self, dtbl, LOO=False,
+                            features_to_mask = [],
+                             within=False, stbl=None):
         """ returns the HC score of dtm1 wrt to doc-term table,
         as well as its rank among internal scores 
         Args:
@@ -105,6 +107,13 @@ class DocTermTable(object):
         else:
             pvals = self.get_Pvals(dtbl)
 
+        # ignore features within 'features_to_mask':
+        for f in features_to_mask :
+            try :
+                pvals[self._feature_names.index(f)] = np.nan
+            except :
+                None
+
         HC, p_thr = hc_vals(pvals, stbl=stbl)
 
         pvals[np.isnan(pvals)] = 1
@@ -121,7 +130,7 @@ class DocTermTable(object):
                  does not match internal HC type of table object.\
                 Rank may be meaningless.")
 
-        else:  #LOO == True
+        elif LOO == True :
             loo_Pvals = self.per_doc_Pvals_LOO(dtbl)[
                 1:]  #remove first item (corresponding to test sample)
 
@@ -265,32 +274,44 @@ class DocTermTable(object):
                                  stbl=self._stbl)
         return new_table
 
-    def get_ChiSquare(self, dtbl):
+    def _get_counts(self, dtbl, within=False) :
         """
         Args: 
-            dtbl -- DocTermTable with respect to which to compute 
-                    score
+            dtbl -- DocTermTable representing another frequency 
+                    counts table
 
-        Returns ChiSquare score 
+        Returns:
+            cnt0 -- adjusted counts of self
+            cnt1 -- adjusted counts of dtbl
         """
+
         if dtbl._feature_names != self._feature_names:
             print(
-                "Warning: features of 'dtbl' do not match object. Changing dtbl accordingly. "
+            "Features of 'dtbl' do not match current DocTermTable\
+             intance. Changing dtbl accordingly."
             )
             #Warning for changing the test object
             dtbl.change_vocabulary(self._feature_names)
             print("Completed.")
-        return two_sample_chi_square(self._counts, dtbl._counts)
 
-    def get_CosineSim(self, dtbl):
-        """ Returns the cosine similarity of another DocTermTable object 
-        'dtbl' with respect to the current one
+        cnt0 = self._counts
+        cnt1 = dtbl._counts
+        if within:
+            cnt0 = cnt0 - cnt1
+            if np.any(cnt0 < 0):
+                raise ValueError("'within == True' is invalid")
+        return cnt0, cnt1
+
+    def get_ChiSquare(self, dtbl, within=False):
+        """ ChiSquare score with respect to another DocTermTable 
+        object 'dtbl'
         """
-        if dtbl._feature_names != self._feature_names:
-            print(
-                "Warning: features of 'dtbl' do not match object. Changing dtbl accordingly. "
-            )
-            #Warning for changing the test object
-            dtbl.change_vocabulary(self._feature_names)
-            print("Completed.")
-        return cosine_sim(self._counts, dtbl._counts)
+        cnt0, cnt1 = self._get_counts(dtbl, within=within)
+        return two_sample_chi_square(cnt0, cnt1)
+
+    def get_CosineSim(self, dtbl, within=False):
+        """ Cosine similarity with respect to another DocTermTable 
+        object 'dtbl'
+        """
+        cnt0, cnt1 = self._get_counts(dtbl, within=within)
+        return cosine_sim(cnt0, cnt1)

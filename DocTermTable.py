@@ -139,7 +139,7 @@ class DocTermTable(object):
             cnt1 -- adjusted counts of dtbl
         """
 
-        if dtbl._feature_names != self._feature_names:
+        if list(dtbl._feature_names) != list(self._feature_names):
             print(
             "Features of 'dtbl' do not match current DocTermTable\
              intance. Changing dtbl accordingly."
@@ -337,9 +337,10 @@ class DocTermTable(object):
             else:
                 rank = np.nan
             if (stbl != self._stbl):
-                print("Warning: HC type stbl == {}\
-                 does not match internal HC type.\
-                 Rank may be meaningless.".format(stbl))
+                print("Warning: HC type stbl == {}"
+                 + " does not match internal HC type." +
+                 " Rank may be meaningless.".format(stbl)
+                     )
 
         elif LOO == True :
             loo_Pvals = self.per_doc_Pvals_LOO(dtbl)[

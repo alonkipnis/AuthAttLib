@@ -405,19 +405,24 @@ class AuthorshipAttributionMulti(object):
         self.reduce_features(list(feat))
         return self._vocab
 
-    def get_discriminating_features(self, x, wrt_authors = [], stbl=True) :
+    def get_discriminating_features(self, x,
+                             wrt_authors = [], stbl=None) :
         """ 
-        Find list of features discriminating x and all authors in a list.
+        Find list of features discriminating x and all
+        authors in a list.
         
         Args:
             x -- input text (list of strings)
-            wrt_authors -- subset of the authors in the model with respect
-                to which to compute HC and features.
+            wrt_authors -- subset of the authors in the model
+                with respect to which to compute HC and features.
                 If empty, evaluate with respect to all authors.
 
         Returns:
             dictionary of scores and features 
         """
+
+        if stbl == None
+            stbl = self._stbl
 
         xdtb = self.to_docTermTable([x])
 

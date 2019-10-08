@@ -435,8 +435,9 @@ class AuthorshipAttributionMulti(object):
         chisq, chisq_pval = agg_model.get_ChiSquare(xdtb)
         cosine = agg_model.get_CosineSim(xdtb)
         
-        return {'HC': HC, 'feat': feat, 'chisq': chisq, 'chisq_pval' : chisq_pval,
-         'rank': rank, 'cosine': cosine}
+        return {'HC': HC, 'feat': feat,
+             'chisq': chisq, 'chisq_pval' : chisq_pval,
+            'cosine': cosine}
 
 
 class AuthorshipAttributionMultiBinary(object):

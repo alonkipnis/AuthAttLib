@@ -240,11 +240,11 @@ class AuthorshipAttributionMulti(object):
 
         df = pd.DataFrame()
 
-        if len(lo_authors) == 0:
+        if len(wrt_authors) == 0:
             # evaluate with resepct to all authors in the model
-            lo_authors = self._AuthorModel
+            wrt_authors = self._AuthorModel
 
-        for auth0 in tqdm(lo_authors):
+        for auth0 in tqdm(wrt_authors):
             md0 = self._AuthorModel[auth0]
             for auth1 in self._AuthorModel:
                 md1 = self._AuthorModel[auth1]
@@ -309,12 +309,12 @@ class AuthorshipAttributionMulti(object):
         # provides statiscs on decision wrt to test sample text
         xdtb = self.to_docTermTable([x])
 
-        if len(lo_authors) == 0:
+        if len(wrt_authors) == 0:
             # evaluate with resepct to all authors in the model
-            lo_authors = self._AuthorModel
+            wrt_authors = self._AuthorModel
 
         df = pd.DataFrame()
-        for auth in tqdm(lo_authors):
+        for auth in tqdm(wrt_authors):
             md = self._AuthorModel[auth]
             HC, rank, feat = md.get_HC_rank_features(xdtb, LOO=LOO)
             chisq, chisq_pval = md.get_ChiSquare(xdtb)
@@ -334,12 +334,13 @@ class AuthorshipAttributionMulti(object):
                 ignore_index=True)
         return df
 
-    def stats_list(self, data, lo_authors=[], LOO=False):
+    def stats_list(self, data, wrt_authors=[], LOO=False):
         """
         Same as internal_stats but for a list of documents 
 
         Arguments:
             data -- list of documents with columns: doc_id|author|text
+
         Returns:
             dataframe with rows: 
             doc_id|author|HC|ChiSq|cosine|rank|wrt_author
@@ -356,11 +357,11 @@ class AuthorshipAttributionMulti(object):
 
         df = pd.DataFrame()
 
-        if len(lo_authors) == 0:
+        if len(wrt_authors) == 0:
             # evaluate with resepct to all authors in the model
-            lo_authors = self._AuthorModel
+            wrt_authors = self._AuthorModel
 
-        for auth0 in tqdm(lo_authors):
+        for auth0 in tqdm(wrt_authors):
             md0 = self._AuthorModel[auth0]
             for r in data.iterrows() :
                 dtbl =  self.to_docTermTable([r[1].text])
@@ -415,28 +416,27 @@ class AuthorshipAttributionMulti(object):
                 If empty, evaluate with respect to all authors.
 
         Returns:
-            HC score
-            A list of strings 
+            dictionary of scores and features 
         """
 
         xdtb = self.to_docTermTable([x])
 
-        if len(lo_authors) == 0:
+        if len(wrt_authors) == 0:
             # evaluate with resepct to all authors in the model
-            lo_authors = self._AuthorModel
+            wrt_authors = self._AuthorModel
 
-        #aggregate counts
+        #aggregate models
         agg_model = None
         for auth in tqdm(lo_authors):
             md = self._AuthorModel[auth]
             agg_model = md.add_table(agg_model)
             
-        HC, _, feat = agg_model.get_HC_rank_features(xdtb, stbl=stbl)
+        HC, _, feat = agg_model.gest_HC_rank_features(xdtb, stbl=stbl)
         chisq, chisq_pval = add_model.get_ChiSquare(xdtb)
         cosine = agg_model.get_CosineSim(xdtb)
         
-        return {'HC': HC, 'chisq': chisq, 'chisq_pval' : chisq_pval,
-         'rank': rank, 'feat': feat, 'cosine': cosine}
+        return {'HC': HC, 'feat': feat, 'chisq': chisq, 'chisq_pval' : chisq_pval,
+         'rank': rank, 'cosine': cosine}
 
 
 class AuthorshipAttributionMultiBinary(object):

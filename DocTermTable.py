@@ -253,6 +253,7 @@ class DocTermTable(object):
                      feature_names=self._feature_names,
                      document_names=list(self._doc_names.keys()), 
                      stbl=self._stbl)
+        return new_table
 
     def add_table(self, dtbl):
         """ Add a DocTermTable object to current one. 

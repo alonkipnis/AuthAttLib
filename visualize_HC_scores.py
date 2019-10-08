@@ -46,6 +46,40 @@ def plot_author_pair(df, value = 'HC', wrt_author = [],
         theme(legend_title=element_blank(), legend_position='top'))
     return p
 
+def plot_author_pair_label(df, value = 'HC', wrt_author = [],
+                     show_legend=True, title=""):
+    
+    df1 = df.filter(['doc_id', 'author', 'wrt_author', value])\
+            .pivot_table(index = ['doc_id','author'],
+                         columns = 'wrt_author',
+                         values = [value])[value].reset_index()
+
+    lo_authors = pd.unique(df1.author)
+    no_authors = len(lo_authors)
+    
+    if no_authors < 2 :
+        raise ValueError
+    
+    if wrt_author == [] :
+        wrt_author = (lo_authors[0],lo_authors[1])
+
+    if (no_authors == 2):
+        color_map = {wrt_author[0]: "red", wrt_author[1]: "blue"}
+    else:
+        color_map = LIST_OF_COLORS
+
+    df1.loc[:, 'x'] = df1.loc[:, wrt_author[0]].astype('float')
+    df1.loc[:, 'y'] = df1.loc[:, wrt_author[1]].astype('float')
+    p = (
+        ggplot(aes(x='x', y='y', color='author', shape = 'author'), data=df1) +
+        geom_point(show_legend=show_legend) + geom_abline(alpha=0.5) +
+        geom_text(aes(label = 'doc_id', check_overlap = True)) +
+        xlab(wrt_author[0]) + ylab(wrt_author[1]) +
+        scale_color_manual(values=color_map) +  #+ xlim(0,35) + ylim(0,35)
+        ggtitle(title) +
+        theme(legend_title=element_blank(), legend_position='top'))
+    return p
+
 def plot_author_pair_HC(df, wrt_author, show_legend=True, title=""):
     warnings.warn("use `plot_author_pair' with value = 'HC'",
                      DeprecationWarning)
@@ -77,6 +111,8 @@ def plot_author_pair_HC(df, wrt_author, show_legend=True, title=""):
 
 
 def plot_author_pair_HC_label(df, wrt_author, show_legend=True, title=""):
+    warnings.warn("use `plot_author_pair_label' with value = 'HC'",
+                     DeprecationWarning)
     df1 = df.filter(['doc_id', 'author', 'wrt_author', 'HC', 'rank'])\
             .pivot_table(index = ['doc_id','author'],
                          columns = 'wrt_author',

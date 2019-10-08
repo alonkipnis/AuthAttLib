@@ -123,7 +123,7 @@ class AuthorshipAttributionMulti(object):
             features_to_mask -- mask these features from HC test. 
 
         Returns:
-            pred -- one of the lo_authors or '<UNK>'
+            pred -- one of the keys in self._AuthorModel or '<UNK>'
             marg -- ratio of second smallest score to smallest scroe
 
         Note:
@@ -140,9 +140,6 @@ class AuthorshipAttributionMulti(object):
         margin = unk_thresh
 
         Xdtb = self.to_docTermTable([x])
-
-        if mask_features :
-            _, _, disc_features = all_authors.get_HC_rank_features(Xdtb)
 
         for i, auth in enumerate(self._AuthorModel):
             am = self._AuthorModel[auth]
@@ -213,14 +210,14 @@ class AuthorshipAttributionMulti(object):
                         ignore_index=True)
         return df
 
-    def internal_stats(self, lo_authors=[], LOO=False):
+    def internal_stats(self, wrt_authors=[], LOO=False):
         """
         Compute scores of each document with respect to the corpus of
         each author. When tested against its own corpus, the document
         is removed from that corpus. 
         
         Args:
-        lo_authors -- subset of the authors in the model with respect
+        wrt_authors -- subset of the authors in the model with respect
                 to which the scores of each document are evaluated.
                 If empty, evaluate with respect to all authors.
         LOO -- indicates whether to compute rank in a leave-of-out mode
@@ -281,7 +278,7 @@ class AuthorshipAttributionMulti(object):
                         ignore_index=True)
         return df
 
-    def predict_stats(self, x, LOO=False):
+    def predict_stats(self, x, wrt_authors=[], LOO=False):
         """ Returns a pandas dataframe with columns representing the 
         statistics: HC score, ChiSquare, rank (of HC), cosine similarity
         where each one is obtained by comparing the input text 'x' to each
@@ -289,6 +286,9 @@ class AuthorshipAttributionMulti(object):
         
         Args:
             x -- input text (list of strings)
+            wrt_authors -- subset of the authors in the model with respect
+                to which the scores of each document are evaluated.
+                If empty, evaluate with respect to all authors.
             LOO -- indicates whether to compute rank in a leave-of-out
                     mode. It leads to more accurate rank-based testing 
                     but require more computations.
@@ -309,8 +309,12 @@ class AuthorshipAttributionMulti(object):
         # provides statiscs on decision wrt to test sample text
         xdtb = self.to_docTermTable([x])
 
+        if len(lo_authors) == 0:
+            # evaluate with resepct to all authors in the model
+            lo_authors = self._AuthorModel
+
         df = pd.DataFrame()
-        for auth in self._AuthorModel:
+        for auth in tqdm(lo_authors):
             md = self._AuthorModel[auth]
             HC, rank, feat = md.get_HC_rank_features(xdtb, LOO=LOO)
             chisq, chisq_pval = md.get_ChiSquare(xdtb)
@@ -332,8 +336,7 @@ class AuthorshipAttributionMulti(object):
 
     def stats_list(self, data, lo_authors=[], LOO=False):
         """
-        Same as internal_stats but for a list of documents represented
-        by data
+        Same as internal_stats but for a list of documents 
 
         Arguments:
             data -- list of documents with columns: doc_id|author|text
@@ -387,7 +390,7 @@ class AuthorshipAttributionMulti(object):
         self._vocab = new_feature_set
         self.re_compute_author_models()
 
-    def reduce_features_from_model_pair(self, auth1, auth2, stbl=None):
+    def reduce_features_from_author_pair(self, auth1, auth2, stbl=None):
         """
             Find list of features (tokens) discriminating auth1 and auth2
             Reduce model to those features. 
@@ -400,6 +403,41 @@ class AuthorshipAttributionMulti(object):
         print("Reducting to {} features".format(len(feat)))
         self.reduce_features(list(feat))
         return self._vocab
+
+    def get_discriminating_features(self, x, wrt_authors = [], stbl=True) :
+        """ 
+        Find list of features discriminating x and all authors in a list.
+        
+        Args:
+            x -- input text (list of strings)
+            wrt_authors -- subset of the authors in the model with respect
+                to which to compute HC and features.
+                If empty, evaluate with respect to all authors.
+
+        Returns:
+            HC score
+            A list of strings 
+        """
+
+        xdtb = self.to_docTermTable([x])
+
+        if len(lo_authors) == 0:
+            # evaluate with resepct to all authors in the model
+            lo_authors = self._AuthorModel
+
+        #aggregate counts
+        agg_model = None
+        for auth in tqdm(lo_authors):
+            md = self._AuthorModel[auth]
+            agg_model = md.add_table(agg_model)
+            
+        HC, _, feat = agg_model.get_HC_rank_features(xdtb, stbl=stbl)
+        chisq, chisq_pval = add_model.get_ChiSquare(xdtb)
+        cosine = agg_model.get_CosineSim(xdtb)
+        
+        return {'HC': HC, 'chisq': chisq, 'chisq_pval' : chisq_pval,
+         'rank': rank, 'feat': feat, 'cosine': cosine}
+
 
 class AuthorshipAttributionMultiBinary(object):
     """ This class uses pair-wise tests to determine most likely author. 

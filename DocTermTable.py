@@ -88,68 +88,6 @@ class DocTermTable(object):
 
         return pv_list
 
-    def get_HC_rank_features(self, dtbl, LOO=False,
-                            features_to_mask = [],
-                             within=False, stbl=None):
-        """ returns the HC score of dtm1 wrt to doc-term table,
-        as well as its rank among internal scores 
-        Args:
-        stbl -- indicates type of HC statistic
-        LOO -- Leave One Out evaluation of the rank (much slower process
-                but more accurate; especially when number of documents
-                is small)
-         """
-
-        if stbl == None:
-            stbl = self._stbl
-
-        if within == True:
-            pvals = self._get_Pvals(dtbl.get_counts(), within == True)
-        else:
-            pvals = self.get_Pvals(dtbl)
-
-        # ignore features within 'features_to_mask':
-        for f in features_to_mask :
-            try :
-                pvals[self._feature_names.index(f)] = np.nan
-            except :
-                None
-
-        HC, p_thr = hc_vals(pvals, stbl=stbl)
-
-        pvals[np.isnan(pvals)] = 1
-        feat = np.array(self._feature_names)[pvals < p_thr]
-
-        if (LOO == False) or (within == True):
-            lo_hc = self._internal_scores
-            if len(lo_hc) > 0:
-                rank = np.mean(np.array(lo_hc) < HC)
-            else:
-                rank = np.nan
-            if (stbl != self._stbl):
-                print("Warning: requested HC type (stable / non-stable)\
-                 does not match internal HC type of table object.\
-                Rank may be meaningless.")
-
-        elif LOO == True :
-            loo_Pvals = self.per_doc_Pvals_LOO(dtbl)[
-                1:]  #remove first item (corresponding to test sample)
-
-            lo_hc = []
-            if (len(loo_Pvals)) == 0:
-                raise ValueError("list of loo Pvals is empty")
-
-            for pv in loo_Pvals:
-                hc, _ = hc_vals(pv, stbl=stbl)
-                lo_hc += [hc]
-
-            if len(lo_hc) > 0:
-                rank = np.mean(np.array(lo_hc) < HC)
-            else:
-                rank = np.nan
-
-        return HC, rank, feat
-
     def get_feature_names(self):
         return self._feature_names
 
@@ -184,6 +122,40 @@ class DocTermTable(object):
         else:
             pv = two_counts_pvals(cnt1, cnt0).pval
         return pv.values
+
+    def _get_counts(self, dtbl, within=False) :
+        """ Returns two list of counts, one from an 
+        external table and one from 'self' while considering
+         'within' parameter to reduce counts from self.
+
+        Args: 
+            dtbl -- DocTermTable representing another frequency 
+                    counts table
+            within -- indicates whether counts of dtbl should be 
+                    reduced from from counts of self._dtm
+
+        Returns:
+            cnt0 -- adjusted counts of self
+            cnt1 -- adjusted counts of dtbl
+        """
+
+        if dtbl._feature_names != self._feature_names:
+            print(
+            "Features of 'dtbl' do not match current DocTermTable\
+             intance. Changing dtbl accordingly."
+            )
+            #Warning for changing the test object
+            dtbl.change_vocabulary(self._feature_names)
+            print("Completed.")
+
+        cnt0 = self._counts
+        cnt1 = dtbl._counts
+        if within:
+            cnt0 = cnt0 - cnt1
+            if np.any(cnt0 < 0):
+                raise ValueError("'within == True' is invalid")
+        return cnt0, cnt1
+
 
     def get_Pvals(self, dtbl):
         """ return a list of p-values of another DocTermTable with 
@@ -275,33 +247,26 @@ class DocTermTable(object):
                                  stbl=self._stbl)
         return new_table
 
-    def _get_counts(self, dtbl, within=False) :
+    def add_table(self, dtbl):
+        """ Add a DocTermTable object to current one. 
+
+        Args:
+            dtbl -- Another DocTermTable.
+
+        Return:
+            DocTermTable object
         """
-        Args: 
-            dtbl -- DocTermTable representing another frequency 
-                    counts table
+    
+        feat = self._feature_names
+        dtbl1 = dtbl.change_vocabulary(feat)
 
-        Returns:
-            cnt0 -- adjusted counts of self
-            cnt1 -- adjusted counts of dtbl
-        """
-
-        if dtbl._feature_names != self._feature_names:
-            print(
-            "Features of 'dtbl' do not match current DocTermTable\
-             intance. Changing dtbl accordingly."
-            )
-            #Warning for changing the test object
-            dtbl.change_vocabulary(self._feature_names)
-            print("Completed.")
-
-        cnt0 = self._counts
-        cnt1 = dtbl._counts
-        if within:
-            cnt0 = cnt0 - cnt1
-            if np.any(cnt0 < 0):
-                raise ValueError("'within == True' is invalid")
-        return cnt0, cnt1
+        dtm_tall = vstack([self._dtm, dtbl1._dtm]).tolil()
+    
+        new_table = DocTermTable(dtm_tall,
+                                 feature_names=feat,
+                                 document_names= self._dtm + dtbl1._dtm,
+                                 stbl=self._stbl)
+        return new_table  
 
     def get_ChiSquare(self, dtbl, within=False):
         """ ChiSquare score with respect to another DocTermTable 
@@ -316,3 +281,65 @@ class DocTermTable(object):
         """
         cnt0, cnt1 = self._get_counts(dtbl, within=within)
         return cosine_sim(cnt0, cnt1)
+
+    def get_HC_rank_features(self, dtbl, LOO=False,
+                            features_to_mask = [],
+                             within=False, stbl=None):
+        """ returns the HC score of dtm1 wrt to doc-term table,
+        as well as its rank among internal scores 
+        Args:
+        stbl -- indicates type of HC statistic
+        LOO -- Leave One Out evaluation of the rank (much slower process
+                but more accurate; especially when number of documents
+                is small)
+         """
+
+        if stbl == None:
+            stbl = self._stbl
+
+        if within == True:
+            pvals = self._get_Pvals(dtbl.get_counts(), within == True)
+        else:
+            pvals = self.get_Pvals(dtbl)
+
+        # ignore features within 'features_to_mask':
+        for f in features_to_mask :
+            try :
+                pvals[self._feature_names.index(f)] = np.nan
+            except :
+                None
+
+        HC, p_thr = hc_vals(pvals, stbl=stbl)
+
+        pvals[np.isnan(pvals)] = 1
+        feat = np.array(self._feature_names)[pvals < p_thr]
+
+        if (LOO == False) or (within == True):
+            lo_hc = self._internal_scores
+            if len(lo_hc) > 0:
+                rank = np.mean(np.array(lo_hc) < HC)
+            else:
+                rank = np.nan
+            if (stbl != self._stbl):
+                print("Warning: HC type stbl == {}\
+                 does not match internal HC type.\
+                 Rank may be meaningless.".format(stbl))
+
+        elif LOO == True :
+            loo_Pvals = self.per_doc_Pvals_LOO(dtbl)[
+                1:]  #remove first item (corresponding to test sample)
+
+            lo_hc = []
+            if (len(loo_Pvals)) == 0:
+                raise ValueError("list of loo Pvals is empty")
+
+            for pv in loo_Pvals:
+                hc, _ = hc_vals(pv, stbl=stbl)
+                lo_hc += [hc]
+
+            if len(lo_hc) > 0:
+                rank = np.mean(np.array(lo_hc) < HC)
+            else:
+                rank = np.nan
+
+        return HC, rank, feat

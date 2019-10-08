@@ -427,7 +427,7 @@ class AuthorshipAttributionMulti(object):
 
         #aggregate models
         agg_model = None
-        for auth in tqdm(lo_authors):
+        for auth in tqdm(wrt_authors):
             md = self._AuthorModel[auth]
             agg_model = md.add_table(agg_model)
             

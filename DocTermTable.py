@@ -247,6 +247,13 @@ class DocTermTable(object):
                                  stbl=self._stbl)
         return new_table
 
+    def copy(self) :
+        new_table = DocTermTable(
+                     self._dtm,
+                     feature_names=self._feature_names,
+                     document_names=self._doc_names, 
+                     stbl=self._stbl)
+
     def add_table(self, dtbl):
         """ Add a DocTermTable object to current one. 
 
@@ -256,7 +263,10 @@ class DocTermTable(object):
         Return:
             DocTermTable object
         """
-    
+        
+        if dtbl == None :
+            return self.copy()
+
         feat = self._feature_names
         dtbl1 = dtbl.change_vocabulary(feat)
 

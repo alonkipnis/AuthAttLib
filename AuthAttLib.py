@@ -432,7 +432,7 @@ class AuthorshipAttributionMulti(object):
             agg_model = md.add_table(agg_model)
             
         HC, _, feat = agg_model.get_HC_rank_features(xdtb, stbl=stbl)
-        chisq, chisq_pval = add_model.get_ChiSquare(xdtb)
+        chisq, chisq_pval = agg_model.get_ChiSquare(xdtb)
         cosine = agg_model.get_CosineSim(xdtb)
         
         return {'HC': HC, 'feat': feat, 'chisq': chisq, 'chisq_pval' : chisq_pval,

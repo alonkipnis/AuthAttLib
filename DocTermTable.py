@@ -267,17 +267,22 @@ class DocTermTable(object):
         
         if dtbl == None :
             return self.copy()
+        else :
+            feat = self._feature_names
 
-        feat = self._feature_names
-        dtbl1 = dtbl.change_vocabulary(feat)
+            feat1 = dtbl._feature_names
 
-        dtm_tall = vstack([self._dtm, dtbl1._dtm]).tolil()
-    
-        new_table = DocTermTable(dtm_tall,
-                                 feature_names=feat,
-                                 document_names= self._dtm + dtbl1._dtm,
-                                 stbl=self._stbl)
-        return new_table  
+            if feat != feat1 :
+                dtbl = dtbl.change_vocabulary(feat)
+
+            dtm_tall = vstack([self._dtm, dtbl._dtm]).tolil()        
+            new_table = DocTermTable(dtm_tall,
+                             feature_names=feat,
+        document_names= list(self._doc_names.keys()) \
+                    + list(dtbl._doc_names.keys()),
+                             stbl=self._stbl
+                                    )
+            return new_table  
 
     def get_ChiSquare(self, dtbl, within=False):
         """ ChiSquare score with respect to another DocTermTable 

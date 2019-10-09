@@ -421,7 +421,7 @@ class AuthorshipAttributionMulti(object):
             dictionary of scores and features 
         """
 
-        if stbl == None
+        if stbl == None :
             stbl = self._stbl
 
         xdtb = self.to_docTermTable([x])

@@ -444,9 +444,14 @@ class AuthorshipAttributionMulti(object):
              'chisq': chisq, 'chisq_pval' : chisq_pval,
             'cosine': cosine}
 
+    def flatten_model(self) :
+        """ Merge all documents to a single one
+        """
+        # TODO ...
+
 
 class AuthorshipAttributionMultiBinary(object):
-    """ This class uses pair-wise tests to determine most likely author. 
+    """ Use pair-wise tests to determine most likely author. 
         It does so by creating AuthorshipAttributionMulti object for each 
         pair of authors and reduces the features of this object. 
 

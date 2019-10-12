@@ -3,10 +3,13 @@ import numpy as np
 import matplotlib.colors as mcolors
 import pandas as pd
 import warnings
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+import scipy
 
 LIST_OF_COLORS = [
-    "#F8766D", "#00BA38", "#619CFF", 'tab:red', 'tab:olive', 'tab:blue',
-    'tab:gray', 'tab:orange', 'tab:purple', 'tab:brown', 'tab:pink',
+    "#F8766D", "#619CFF", 'tab:gray', "#00BA38", 'tab:red',
+    'tab:olive', 'tab:blue',
+    'tab:orange', 'tab:purple', 'tab:brown', 'tab:pink',
     'tab:green', 'tab:cyan', 'royalblue', 'darksaltgray', 'forestgreen',
     'cyan', 'navy'
     'magenta', '#595959', 'lightseagreen', 'orangered', 'crimson'
@@ -29,10 +32,7 @@ def plot_author_pair(df, value = 'HC', wrt_author = [],
     if wrt_author == [] :
         wrt_author = (lo_authors[0],lo_authors[1])
 
-    if (no_authors == 2):
-        color_map = {wrt_author[0]: "red", wrt_author[1]: "blue"}
-    else:
-        color_map = LIST_OF_COLORS
+    color_map = LIST_OF_COLORS
 
     df1.loc[:, 'x'] = df1.loc[:, wrt_author[0]].astype('float')
     df1.loc[:, 'y'] = df1.loc[:, wrt_author[1]].astype('float')
@@ -60,13 +60,7 @@ def plot_author_pair_label(df, value = 'HC', wrt_author = [],
     if no_authors < 2 :
         raise ValueError
     
-    if wrt_author == [] :
-        wrt_author = (lo_authors[0],lo_authors[1])
-
-    if (no_authors == 2):
-        color_map = {wrt_author[0]: "red", wrt_author[1]: "blue"}
-    else:
-        color_map = LIST_OF_COLORS
+    color_map = LIST_OF_COLORS
 
     df1.loc[:, 'x'] = df1.loc[:, wrt_author[0]].astype('float')
     df1.loc[:, 'y'] = df1.loc[:, wrt_author[1]].astype('float')
@@ -311,4 +305,62 @@ def plot_author_pair_pval_col(df, wrt_author=('Author1', 'Author2')):
          scale_fill_manual(['red', 'blue']) +
          theme(legend_title=element_blank(), legend_position='top'))
     #ggtitle('Rank wrt each author ' + labels[0] + ' vs '+ labels[1])
+    return p
+
+def plot_LDA(df, wrt_authors, test_author, sym = False) : 
+
+    df1 = df.filter(['doc_id', 'author', 'wrt_author', 'HC', 'rank'])\
+                .pivot_table(index = ['doc_id','author'],
+                             columns = 'wrt_author',
+                             values = ['HC', 'rank']).HC.reset_index()
+
+    #project to discriminant component    
+    if sym :  # project to the line perpendicular to y=x
+        df1.loc[:,'t'] = np.dot(df1.filter(wrt_authors), [[1],[-1]]) 
+    else : #LDA
+        df_red = df1[df1.author.isin(wrt_authors)]
+        X = np.array(np.vstack([df_red[wrt_authors[0]], df_red[wrt_authors[1]]]).T)
+        y = np.array(df_red.author)
+        clf = LinearDiscriminantAnalysis()
+        clf.fit(X, y)  
+        LinearDiscriminantAnalysis(n_components=None, priors=None, shrinkage=None,
+                      solver='lsqr', store_covariance=True, tol=0.0001)
+        df1.loc[:,'t'] = clf.transform(df1.filter(wrt_authors))
+
+    #compute means and pooled variance
+    df_stat =  df1.groupby('author').t.agg(['var', 'count', 'mean']).loc[wrt_authors,:]
+    num = 0
+    den = 0
+    for c in df_stat.iterrows() :
+        num += c[1]['var'] * (c[1]['count'] - 1)
+        den += c[1]['count']
+    pooled_std = np.sqrt( num / (den - len(df_stat)))
+    
+    
+    df1.loc[:,wrt_authors[0]] = scipy.stats.norm.pdf(df1.t,
+                        loc = df_stat.loc[wrt_authors[0],'mean'],
+                        scale = pooled_std
+                        )
+    
+    df1.loc[:,wrt_authors[1]] = scipy.stats.norm.pdf(df1.t,
+                        loc = df_stat.loc[wrt_authors[1],'mean'],
+                        scale = pooled_std
+                        )
+    
+    df_plot = df1[df1.author.isin(wrt_authors) | (df1.author == test_author)]\
+              .melt(['t','author','doc_id'], [wrt_authors[0],wrt_authors[1]])
+ 
+    p = (ggplot(aes(x='t', y = 'value', color = 'author', fill = 'author', label = 'doc_id'),
+                data=df_plot) +
+         geom_rug(aes(x = 't', y = 0, color = 'author'), position = position_jitter(height = 0), size = 1) +
+         geom_bar(aes(x='t', y='value'), stat='identity', position='dodge', size = 1) +
+         #geom_label(aes(y = 'value'), color = 'black') + 
+         scale_fill_manual(LIST_OF_COLORS) + scale_color_manual(LIST_OF_COLORS)+
+         stat_function(fun = scipy.stats.norm.pdf,
+                       args = {'loc' : df_stat.loc[wrt_authors[0],'mean'],
+                               'scale' : pooled_std}, color = LIST_OF_COLORS[0]) +
+         stat_function(fun = scipy.stats.norm.pdf,
+                       args = {'loc' : df_stat.loc[wrt_authors[1],'mean'],
+                               'scale' : pooled_std}, color = LIST_OF_COLORS[1])
+         + ylab('prob') + xlab('projected score'))
     return p

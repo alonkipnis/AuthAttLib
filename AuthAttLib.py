@@ -488,7 +488,7 @@ class AuthorshipAttributionMultiBinary(object):
                              for auth2 in lo_authors if auth1 < auth2 ]
 
         print("Found {} author-pairs".format(len(lo_author_pairs)))
-        for ap in tqdm(lo_author_pairs):  # AuthorPair model for each pair
+        for ap in lo_author_pairs:  # AuthorPair model for each pair
             print("MultiBinaryAuthorModel: Creating model for {} vs {}"\
                 .format(ap[0],ap[1]))
 
@@ -505,14 +505,15 @@ class AuthorshipAttributionMultiBinary(object):
 
     def predict(self, x, method='HC'):
         def predict_max(df1):
+            "Whoever win most"
             cnt = df1.pred.value_counts()
             imx = cnt.values == cnt.values.max()
             if sum(imx) == 1:
                 return cnt.index[imx][0]
-            else:
+            else: #in the case of a draw
                 return '<UNK>'
 
-        df1 = self.predict_stats(x, LOO=False,method=method)
+        df1 = self.predict_stats(x, LOO=False, method=method)
 
         predict = predict_max(df1)
         return predict

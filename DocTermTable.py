@@ -14,7 +14,8 @@ def change_dtm_dictionary(dtm, old_vocab, new_vocab):
        old_vocab and new_vocab are lists of words (without duplicaties)
     """
 
-    new_dtm = scipy.sparse.lil_matrix(np.zeros((dtm.shape[0], len(new_vocab))))
+    new_dtm = scipy.sparse.lil_matrix(np.zeros((dtm.shape[0],
+                                             len(new_vocab))))
     for i, w in enumerate(new_vocab):
         try:
             new_dtm[:, i] = dtm[:, old_vocab.index(w)]
@@ -24,14 +25,21 @@ def change_dtm_dictionary(dtm, old_vocab, new_vocab):
 
 
 class DocTermTable(object):
-    """ Facilitate p-value, Higher Criticism (HC), and cosine similarity
-    computations with with respect to a document-term matrix.
+    """ Interface for p-value, Higher Criticism (HC), and cosine
+    similarity computations with with respect to a document-term matrix.
  
     Args: 
             dtm -- (sparse) doc-term matrix.
             feature_names -- list of names for each column of dtm.
             document_names -- list of names for each row of dtm.
             stbl -- type of HC statistic to use 
+
+    To Do:
+        - implement a method to collapse the table to a single row
+          in order to save memory and computing time
+        - rank of ChiSquare in LOO
+        - log(pval) in ChiSquare test 
+
     """
     def __init__(self, dtm, feature_names=[], document_names=[], stbl=True):
         """ 
@@ -53,7 +61,8 @@ class DocTermTable(object):
 
         if dtm.sum() == 0:
             raise ValueError(
-                "seems like all counts are zero. Did you pass the wrong data format?"
+                "seems like all counts are zero. "\
+                +"Did you pass the wrong data format?"
             )
 
         self.__compute_internal_stat()
@@ -188,7 +197,8 @@ class DocTermTable(object):
 
         if dtbl._feature_names != self._feature_names:
             print(
-                "Warning: features of 'dtbl' do not match object. Changing dtbl accordingly. "
+                "Warning: features of 'dtbl' do not match object. "\
+                +"Changing dtbl accordingly. "
             )
             #Warning for changing the test object
             dtbl.change_vocabulary(self._feature_names)
@@ -197,6 +207,9 @@ class DocTermTable(object):
         return self.__per_doc_Pvals_LOO(dtbl._dtm)
 
     def change_vocabulary(self, new_vocabulary):
+        """ Shift and remove columns of self._dtm so that it 
+        represents counts with respect to new_vocabulary
+        """
         new_dtm = scipy.sparse.lil_matrix(
             np.zeros((self._dtm.shape[0], len(new_vocabulary))))
         old_vocab = self._feature_names
@@ -205,8 +218,8 @@ class DocTermTable(object):
         for i, w in enumerate(new_vocabulary):
             try:
                 new_dtm[:, i] = self._dtm[:, old_vocab.index(w)]
-            except:  #exception occurs if a word in the
-                #new vocabulary does not exists in old one
+            except:  # occurs if a word in the
+                # new vocabulary does not exists in old one.
                 no_missing_words += 1
 
         self._dtm = new_dtm
@@ -256,7 +269,8 @@ class DocTermTable(object):
         return new_table
 
     def add_table(self, dtbl):
-        """ Add a DocTermTable object to current one. 
+        """ Returns a new DocTermTable object after adding
+        a second DocTermTable to the current one. 
 
         Args:
             dtbl -- Another DocTermTable.
@@ -269,7 +283,6 @@ class DocTermTable(object):
             return self.copy()
         else :
             feat = self._feature_names
-
             feat1 = dtbl._feature_names
 
             if feat != feat1 :

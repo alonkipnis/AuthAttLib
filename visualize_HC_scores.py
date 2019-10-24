@@ -15,7 +15,7 @@ LIST_OF_COLORS = [
     'magenta', '#595959', 'lightseagreen', 'orangered', 'crimson'
 ]
 
-def plot_author_pair(df, value = 'HC', wrt_author = [],
+def plot_author_pair(df, value = 'HC', wrt_authors = [],
                      show_legend=True, title=""):
     
     df1 = df.filter(['doc_id', 'author', 'wrt_author', value])\
@@ -29,24 +29,24 @@ def plot_author_pair(df, value = 'HC', wrt_author = [],
     if no_authors < 2 :
         raise ValueError
     
-    if wrt_author == [] :
-        wrt_author = (lo_authors[0],lo_authors[1])
+    if wrt_authors == [] :
+        wrt_authors = (lo_authors[0],lo_authors[1])
 
     color_map = LIST_OF_COLORS
 
-    df1.loc[:, 'x'] = df1.loc[:, wrt_author[0]].astype('float')
-    df1.loc[:, 'y'] = df1.loc[:, wrt_author[1]].astype('float')
+    df1.loc[:, 'x'] = df1.loc[:, wrt_authors[0]].astype('float')
+    df1.loc[:, 'y'] = df1.loc[:, wrt_authors[1]].astype('float')
     p = (
         ggplot(aes(x='x', y='y', color='author', shape = 'author'), data=df1) +
         geom_point(show_legend=show_legend) + geom_abline(alpha=0.5) +
         # geom_text(aes(label = 'doc_id', check_overlap = True)) +
-        xlab(wrt_author[0]) + ylab(wrt_author[1]) +
+        xlab(wrt_authors[0]) + ylab(wrt_authors[1]) +
         scale_color_manual(values=color_map) +  #+ xlim(0,35) + ylim(0,35)
         ggtitle(title) +
         theme(legend_title=element_blank(), legend_position='top'))
     return p
 
-def plot_author_pair_label(df, value = 'HC', wrt_author = [],
+def plot_author_pair_label(df, value = 'HC', wrt_authors = [],
                      show_legend=True, title=""):
     
     df1 = df.filter(['doc_id', 'author', 'wrt_author', value])\
@@ -62,19 +62,19 @@ def plot_author_pair_label(df, value = 'HC', wrt_author = [],
     
     color_map = LIST_OF_COLORS
 
-    df1.loc[:, 'x'] = df1.loc[:, wrt_author[0]].astype('float')
-    df1.loc[:, 'y'] = df1.loc[:, wrt_author[1]].astype('float')
+    df1.loc[:, 'x'] = df1.loc[:, wrt_authors[0]].astype('float')
+    df1.loc[:, 'y'] = df1.loc[:, wrt_authors[1]].astype('float')
     p = (
         ggplot(aes(x='x', y='y', color='author', shape = 'author'), data=df1) +
         geom_point(show_legend=show_legend) + geom_abline(alpha=0.5) +
         geom_text(aes(label = 'doc_id', check_overlap = True)) +
-        xlab(wrt_author[0]) + ylab(wrt_author[1]) +
+        xlab(wrt_authors[0]) + ylab(wrt_authors[1]) +
         scale_color_manual(values=color_map) +  #+ xlim(0,35) + ylim(0,35)
         ggtitle(title) +
         theme(legend_title=element_blank(), legend_position='top'))
     return p
 
-def plot_author_pair_HC(df, wrt_author, show_legend=True, title=""):
+def plot_author_pair_HC(df, wrt_authors, show_legend=True, title=""):
     warnings.warn("use `plot_author_pair' with value = 'HC'",
                      DeprecationWarning)
 
@@ -87,24 +87,24 @@ def plot_author_pair_HC(df, wrt_author, show_legend=True, title=""):
     no_authors = len(pd.unique(df1.author))
 
     if (no_authors == 2):
-        color_map = {wrt_author[0]: "red", wrt_author[1]: "blue"}
+        color_map = {wrt_authors[0]: "red", wrt_authors[1]: "blue"}
     else:
         color_map = LIST_OF_COLORS
 
-    df1.loc[:, 'x'] = df1.loc[:, wrt_author[0]].astype('float')
-    df1.loc[:, 'y'] = df1.loc[:, wrt_author[1]].astype('float')
+    df1.loc[:, 'x'] = df1.loc[:, wrt_authors[0]].astype('float')
+    df1.loc[:, 'y'] = df1.loc[:, wrt_authors[1]].astype('float')
     p = (
         ggplot(aes(x='x', y='y', color='author'), data=df1) +
         geom_point(show_legend=show_legend) + geom_abline(alpha=0.5) +
         # geom_text(aes(label = 'doc_id', check_overlap = True)) +
-        xlab(wrt_author[0]) + ylab(wrt_author[1]) +
+        xlab(wrt_authors[0]) + ylab(wrt_authors[1]) +
         scale_color_manual(values=color_map) +  #+ xlim(0,35) + ylim(0,35)
         ggtitle(title) +
         theme(legend_title=element_blank(), legend_position='top'))
     return p
 
 
-def plot_author_pair_HC_label(df, wrt_author, show_legend=True, title=""):
+def plot_author_pair_HC_label(df, wrt_authors, show_legend=True, title=""):
     warnings.warn("use `plot_author_pair_label' with value = 'HC'",
                      DeprecationWarning)
     df1 = df.filter(['doc_id', 'author', 'wrt_author', 'HC', 'rank'])\
@@ -115,7 +115,7 @@ def plot_author_pair_HC_label(df, wrt_author, show_legend=True, title=""):
     no_authors = len(pd.unique(df1.author))
 
     if (no_authors == 2):
-        color_map = {wrt_author[0]: "red", wrt_author[1]: "blue"}
+        color_map = {wrt_authors[0]: "red", wrt_authors[1]: "blue"}
     else:
         color_map = LIST_OF_COLORS
 
@@ -127,18 +127,18 @@ def plot_author_pair_HC_label(df, wrt_author, show_legend=True, title=""):
 
     df1['doc_id'] = df1.doc_id.apply(lambda x: truncate_title(x, 11))
 
-    df1.loc[:, 'x'] = df1.loc[:, wrt_author[0]].astype('float')
-    df1.loc[:, 'y'] = df1.loc[:, wrt_author[1]].astype('float')
+    df1.loc[:, 'x'] = df1.loc[:, wrt_authors[0]].astype('float')
+    df1.loc[:, 'y'] = df1.loc[:, wrt_authors[1]].astype('float')
     p = (ggplot(aes(x='x', y='y', fill='author'), data=df1) +
          geom_point(show_legend=show_legend) + geom_abline(alpha=0.5) +
-         geom_label(aes(label='doc_id'), size=10) + xlab(wrt_author[0]) +
-         ylab(wrt_author[1]) + scale_color_manual(values=color_map) +
+         geom_label(aes(label='doc_id'), size=10) + xlab(wrt_authors[0]) +
+         ylab(wrt_authors[1]) + scale_color_manual(values=color_map) +
          ggtitle(title) +
          theme(legend_title=element_blank(), legend_position='top'))
     return p
 
 
-def plot_author_pair_cosine(df, wrt_author, show_legend=True, title=""):
+def plot_author_pair_cosine(df, wrt_authors, show_legend=True, title=""):
     warnings.warn("use `plot_author_pair' with value = 'cosine'",
                      DeprecationWarning)
 
@@ -150,24 +150,24 @@ def plot_author_pair_cosine(df, wrt_author, show_legend=True, title=""):
     no_authors = len(pd.unique(df1.author))
 
     if (no_authors == 2):
-        color_map = {wrt_author[0]: "red", wrt_author[1]: "blue"}
+        color_map = {wrt_authors[0]: "red", wrt_authors[1]: "blue"}
     else:
         color_map = LIST_OF_COLORS
 
-    df1.loc[:, 'x'] = df1.loc[:, wrt_author[0]].astype('float')
-    df1.loc[:, 'y'] = df1.loc[:, wrt_author[1]].astype('float')
+    df1.loc[:, 'x'] = df1.loc[:, wrt_authors[0]].astype('float')
+    df1.loc[:, 'y'] = df1.loc[:, wrt_authors[1]].astype('float')
     p = (
         ggplot(aes(x='x', y='y', color='author'), data=df1) +
         geom_point(show_legend=show_legend) + geom_abline(alpha=0.5) +
         # geom_text(aes(label = 'doc_id', check_overlap = True)) +
-        xlab(wrt_author[0]) + ylab(wrt_author[1]) +
+        xlab(wrt_authors[0]) + ylab(wrt_authors[1]) +
         scale_color_manual(values=color_map) +  #+ xlim(0,35) + ylim(0,35)
         ggtitle(title) +
         theme(legend_title=element_blank(), legend_position='top'))
     return p
 
 
-def plot_author_pair_rank(df, wrt_author=('Author1', 'Author2')):
+def plot_author_pair_rank(df, wrt_authors=('Author1', 'Author2')):
     warnings.warn("use `plot_author_pair' with value = 'rank'",
                      DeprecationWarning)
 
@@ -176,21 +176,21 @@ def plot_author_pair_rank(df, wrt_author=('Author1', 'Author2')):
                          columns = 'wrt_author',
                          values = ['HC', 'rank'])['rank'].reset_index()
     #HC
-    df1.loc[:, 'x'] = df1.loc[:, wrt_author[0]].astype('float')
-    df1.loc[:, 'y'] = df1.loc[:, wrt_author[1]].astype('float')
+    df1.loc[:, 'x'] = df1.loc[:, wrt_authors[0]].astype('float')
+    df1.loc[:, 'y'] = df1.loc[:, wrt_authors[1]].astype('float')
     p = (ggplot(aes(x='x', y='y', color='author'), data=df1) +
          geom_point(show_legend=False) + geom_abline(alpha=0.5) + xlim(0, 1) +
-         ylim(0, 1) + xlab(wrt_author[0]) + ylab(wrt_author[1]) +
+         ylim(0, 1) + xlab(wrt_authors[0]) + ylab(wrt_authors[1]) +
          scale_color_manual(values={
-             wrt_author[0]: "red",
-             wrt_author[1]: "blue",
+             wrt_authors[0]: "red",
+             wrt_authors[1]: "blue",
              'disputed': 'black'
          }) + theme(legend_title=element_blank(), legend_position='top'))  # +
     #ggtitle('Rank wrt each author ' + labels[0] + ' vs '+ labels[1])
     return p
 
 
-def plot_author_pair_ROC(df, wrt_author=('Author1', 'Author2')):
+def plot_author_pair_ROC(df, wrt_authors=('Author1', 'Author2')):
     df1 = df.filter(['doc_id', 'author', 'wrt_author', 'HC', 'rank'])\
             .pivot_table(index = ['doc_id','author'],
                          columns = 'wrt_author',
@@ -211,9 +211,9 @@ def plot_author_pair_ROC(df, wrt_author=('Author1', 'Author2')):
         })
         return roc
 
-    df1.loc[:, 'r'] = df1.loc[:, wrt_author[1]] / df1.loc[:, wrt_author[0]]
-    FD_scores = df1[df1.author == wrt_author[0]].r
-    TD_scores = df1[df1.author == wrt_author[1]].r
+    df1.loc[:, 'r'] = df1.loc[:, wrt_authors[1]] / df1.loc[:, wrt_authors[0]]
+    FD_scores = df1[df1.author == wrt_authors[0]].r
+    TD_scores = df1[df1.author == wrt_authors[1]].r
     row = ROC(FD_scores, TD_scores)
 
     p = (ggplot(row, aes(x='FDR', y='TDR')) + geom_line(color='red')
@@ -221,7 +221,7 @@ def plot_author_pair_ROC(df, wrt_author=('Author1', 'Author2')):
     return p
 
 
-def plot_author_pair_pval(df, wrt_author=('Author1', 'Author2')):
+def plot_author_pair_pval(df, wrt_authors=('Author1', 'Author2')):
     warnings.warn("use `plot_author_pair' with value = 'pval'",
                      DeprecationWarning)
 
@@ -230,26 +230,26 @@ def plot_author_pair_pval(df, wrt_author=('Author1', 'Author2')):
                          columns = 'wrt_author',
                          values = ['HC', 'rank'])['rank'].reset_index()
 
-    kx = df[df.author == wrt_author[0]].doc_id.unique().size
-    df1.loc[:, 'pval_x'] = 1 - df1.loc[:, wrt_author[0]].astype(
+    kx = df[df.author == wrt_authors[0]].doc_id.unique().size
+    df1.loc[:, 'pval_x'] = 1 - df1.loc[:, wrt_authors[0]].astype(
         'float') * kx / (kx + 1)
-    ky = df[df.author == wrt_author[1]].doc_id.unique().size
-    df1.loc[:, 'pval_y'] = 1 - df1.loc[:, wrt_author[1]].astype(
+    ky = df[df.author == wrt_authors[1]].doc_id.unique().size
+    df1.loc[:, 'pval_y'] = 1 - df1.loc[:, wrt_authors[1]].astype(
         'float') * ky / (ky + 1)
 
     p = (ggplot(aes(x='pval_x', y='pval_y', color='author'), data=df1) +
          geom_point(show_legend=True) + geom_abline(alpha=0.5) + xlim(0, 1) +
-         ylim(0, 1) + xlab(wrt_author[0]) + ylab(wrt_author[1]) +
+         ylim(0, 1) + xlab(wrt_authors[0]) + ylab(wrt_authors[1]) +
          scale_color_manual(values={
-             wrt_author[0]: "red",
-             wrt_author[1]: "blue",
+             wrt_authors[0]: "red",
+             wrt_authors[1]: "blue",
              'disputed': 'black'
          }) + theme(legend_title=element_blank(), legend_position='top'))  # +
     #ggtitle('Rank wrt each author ' + labels[0] + ' vs '+ labels[1])
     return p
 
 
-def plot_author_pair_ChiSquare(df, wrt_author, show_legend=True, title=""):
+def plot_author_pair_ChiSquare(df, wrt_authors, show_legend=True, title=""):
     warnings.warn("use `plot_author_pair' with value = 'chisq'",
                      DeprecationWarning)
 
@@ -261,41 +261,41 @@ def plot_author_pair_ChiSquare(df, wrt_author, show_legend=True, title=""):
     no_authors = len(pd.unique(df1.author))
 
     if (no_authors == 2):
-        color_map = {wrt_author[0]: "red", wrt_author[1]: "blue"}
+        color_map = {wrt_authors[0]: "red", wrt_authors[1]: "blue"}
     else:
         color_map = LIST_OF_COLORS
 
-    df1.loc[:, 'x'] = df1.loc[:, wrt_author[0]].astype('float')
-    df1.loc[:, 'y'] = df1.loc[:, wrt_author[1]].astype('float')
+    df1.loc[:, 'x'] = df1.loc[:, wrt_authors[0]].astype('float')
+    df1.loc[:, 'y'] = df1.loc[:, wrt_authors[1]].astype('float')
     p = (
         ggplot(aes(x='x', y='y', color='author'), data=df1) +
         geom_point(show_legend=show_legend) + geom_abline(alpha=0.5) +
         # geom_text(aes(label = 'doc_id', check_overlap = True)) +
-        xlab(wrt_author[0]) + ylab(wrt_author[1]) +
+        xlab(wrt_authors[0]) + ylab(wrt_authors[1]) +
         scale_color_manual(values=color_map) +  #+ xlim(0,35) + ylim(0,35)
         ggtitle(title) +
         theme(legend_title=element_blank(), legend_position='top'))
     return p
 
 
-def plot_author_pair_pval_col(df, wrt_author=('Author1', 'Author2')):
+def plot_author_pair_pval_col(df, wrt_authors=('Author1', 'Author2')):
     df1 = df.filter(['doc_id', 'author', 'wrt_author', 'HC', 'rank'])\
             .pivot_table(index = ['doc_id','author'],
                          columns = 'wrt_author',
                          values = ['HC', 'rank'])['rank'].reset_index()
 
-    kx = df[df.author == wrt_author[0]].doc_id.unique().size
-    df1.loc[:, 'pval_x'] = 1 - df1.loc[:, wrt_author[0]].astype(
+    kx = df[df.author == wrt_authors[0]].doc_id.unique().size
+    df1.loc[:, 'pval_x'] = 1 - df1.loc[:, wrt_authors[0]].astype(
         'float') * kx / (kx + 1)
-    ky = df[df.author == wrt_author[1]].doc_id.unique().size
-    df1.loc[:, 'pval_y'] = 1 - df1.loc[:, wrt_author[1]].astype(
+    ky = df[df.author == wrt_authors[1]].doc_id.unique().size
+    df1.loc[:, 'pval_y'] = 1 - df1.loc[:, wrt_authors[1]].astype(
         'float') * ky / (ky + 1)
 
     df2 = df1.melt(['author', 'doc_id'], ['pval_x', 'pval_y'],
                    var_name='wrt_author')
     df2.wrt_author = df2.wrt_author.str.replace('pval_x',
-                                                wrt_author[0]).replace(
-                                                    'pval_y', wrt_author[1])
+                                                wrt_authors[0]).replace(
+                                                    'pval_y', wrt_authors[1])
     df2.doc_id = df2.doc_id.astype(int).astype(str)
 
     p = (ggplot(aes(x='doc_id', y='value', fill='wrt_author'),
@@ -307,12 +307,12 @@ def plot_author_pair_pval_col(df, wrt_author=('Author1', 'Author2')):
     #ggtitle('Rank wrt each author ' + labels[0] + ' vs '+ labels[1])
     return p
 
-def plot_LDA(df, wrt_authors, test_author, sym = False) : 
+def plot_LDA(df, value, wrt_authors, test_author, sym = False) : 
 
-    df1 = df.filter(['doc_id', 'author', 'wrt_author', 'HC', 'rank'])\
-                .pivot_table(index = ['doc_id','author'],
-                             columns = 'wrt_author',
-                             values = ['HC', 'rank']).HC.reset_index()
+    df1 = df.filter(['doc_id', 'author', 'wrt_author', value])\
+            .pivot_table(index = ['doc_id','author'],
+                         columns = 'wrt_author',
+                         values = [value])[value].reset_index()
 
     #project to discriminant component    
     if sym :  # project to the line perpendicular to y=x

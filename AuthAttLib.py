@@ -65,14 +65,14 @@ class AuthorshipAttributionMulti(object):
         lo_authors = pd.unique(data.author)
         for auth in lo_authors:
             data_auth = data[data.author == auth]
-            print("\t Creating author-model for {} using {} features"\
+            print("\t Creating author-model for {} using {} features..."\
                 .format(auth, len(self._vocab)))
 
             self._AuthorModel[auth] = self.to_docTermTable(
                                 list(data_auth.text),
                                 document_names=list(data_auth.doc_id)
                                 )
-            print("\t\tfound {} documents and {} relevant tokens"\
+            print("\t\tfound {} documents and {} relevant tokens."\
             .format(len(data_auth),
                 self._AuthorModel[auth]._counts.sum()))
 
@@ -110,7 +110,7 @@ class AuthorshipAttributionMulti(object):
         for auth in self._AuthorModel:
             am = self._AuthorModel[auth]
             am.change_vocabulary(self._vocab)
-            print("Changing vocabulary for {}. Found {} relevant tokens"\
+            print("Changing vocabulary for {}. Found {} relevant tokens."\
                 .format(auth, am._counts.sum()))
 
     def predict(self, x, method='HC', features_to_mask = [],
@@ -353,7 +353,7 @@ class AuthorshipAttributionMulti(object):
             doc_id -- the document identifyer.
             wrt_author -- author of the corpus against which the
                          document is tested.
-            HC, ChiSq, cosine -- HC score, Chi-Square score, and cosine
+            HC, ChiSq, cosine -- HC score, Chi-Square score, a\\\\\\\\\nd cosine
                                  similarity, respectively, between the 
                                  document and the corpus.
             rank -- the rank of the HC score compared to other documents 

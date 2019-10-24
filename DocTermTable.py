@@ -35,7 +35,7 @@ class DocTermTable(object):
             stbl -- type of HC statistic to use 
 
     To Do:
-        - implement a method to collapse the table to a single row
+        - DONE: implement a method to collapse the table to a single row
           in order to save memory and computing time
         - rank of ChiSquare in LOO
         - log(pval) in ChiSquare test 
@@ -56,7 +56,7 @@ class DocTermTable(object):
             (s, i) for i, s, in enumerate(document_names[:dtm.shape[0]])
         ])
         self._feature_names = feature_names  #: list of feature names (vocabulary)
-        self._dtm = dtm  #: matrix representing doc-term-counts
+        self._dtm = dtm  #: doc-term-table (matrix)
         self._stbl = stbl  #: type of HC score to use
 
         if dtm.sum() == 0:
@@ -75,9 +75,11 @@ class DocTermTable(object):
         self._counts = np.squeeze(np.array(self._dtm.sum(0))).astype(int)
 
         #keep HC score of each row w.r.t. the rest
-        pv_list = self.__per_doc_Pvals()
+        #pv_list = self.__per_doc_Pvals()
         self._internal_scores = []
-        for pv in pv_list:
+        for row in self._dtm:
+            cnt = np.squeeze(np.array(row.todense()).astype(int))
+            pv = self._get_Pvals(cnt, within = True)
             hc, p_thr = hc_vals(pv, stbl=self._stbl, alpha=0.45)
             self._internal_scores += [hc]
 
@@ -135,7 +137,7 @@ class DocTermTable(object):
     def _get_counts(self, dtbl, within=False) :
         """ Returns two list of counts, one from an 
         external table and one from 'self' while considering
-         'within' parameter to reduce counts from self.
+         'within' parameter to reduce counts from 'self'.
 
         Args: 
             dtbl -- DocTermTable representing another frequency 
@@ -168,11 +170,11 @@ class DocTermTable(object):
 
     def get_Pvals(self, dtbl):
         """ return a list of p-values of another DocTermTable with 
-        respect doc-term table.
+        respect 'self' doc-term table.
 
         Args: 
-            dtbl -- DocTermTable with respect to which to compute 
-                    pvals
+            dtbl -- DocTermTable object with respect to which to
+                    compute pvals
         """
 
         if dtbl._feature_names != self._feature_names:
@@ -198,11 +200,10 @@ class DocTermTable(object):
         if dtbl._feature_names != self._feature_names:
             print(
                 "Warning: features of 'dtbl' do not match object. "\
-                +"Changing dtbl accordingly. "
+                +"Changing dtbl accordingly... "
             )
             #Warning for changing the test object
             dtbl.change_vocabulary(self._feature_names)
-            print("Completed.")
 
         return self.__per_doc_Pvals_LOO(dtbl._dtm)
 
@@ -260,6 +261,10 @@ class DocTermTable(object):
                                  stbl=self._stbl)
         return new_table
 
+    def collapse_dtm(self) :
+        """sum all documents to a single one"""
+        self._dtm = self._dtm.sum(0)
+
     def copy(self) :
         new_table = DocTermTable(
                      self._dtm,
@@ -309,6 +314,7 @@ class DocTermTable(object):
         object 'dtbl'
         """
         cnt0, cnt1 = self._get_counts(dtbl, within=within)
+
         return cosine_sim(cnt0, cnt1)
 
     def get_HC_rank_features(self, dtbl, LOO=False,
@@ -317,10 +323,10 @@ class DocTermTable(object):
         """ returns the HC score of dtm1 wrt to doc-term table,
         as well as its rank among internal scores 
         Args:
-        stbl -- indicates type of HC statistic
-        LOO -- Leave One Out evaluation of the rank (much slower process
-                but more accurate; especially when number of documents
-                is small)
+            stbl -- indicates type of HC statistic
+            LOO -- Leave One Out evaluation of the rank (much slower process
+                    but more accurate; especially when number of documents
+                    is small)
          """
 
         if stbl == None:

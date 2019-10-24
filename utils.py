@@ -12,7 +12,7 @@ import re
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-def two_sample_chi_square(c1, c2):
+def two_sample_chi_square(c1, c2, lambda_="pearson"):
     """returns the Chi-Square score of the two samples c1 and c2
      (representing counts). Null cells are ignored. 
 
@@ -24,10 +24,13 @@ def two_sample_chi_square(c1, c2):
         pval -- p-value
     """
     
-    obs = np.array([c1, c2])
-    chisq, pval, dof, exp = chi2_contingency(obs[:,obs.sum(0)!=0])
-    
-    return chisq - dof, pval
+    if (sum(c1) == 0) or (sum(c2) == 0) :
+        return np.nan, 1
+    else :
+        obs = np.array([c1, c2])
+        chisq, pval, dof, exp = chi2_contingency(obs[:,obs.sum(0)!=0],
+                                        lambda_=lambda_)
+        return chisq - dof, pval
 
 def cosine_sim(c1, c2):
     """
@@ -132,9 +135,10 @@ def term_counts(text, vocab=[], symbols=[]):
     df = pd.concat([df, pd.DataFrame({'feature': vocab, 'n': tc})])
     return df
 
-def to_docTermCounts(lo_texts, vocab=[], max_features=500, ngram_range=(1, 1)):
+def to_docTermCounts(lo_texts, vocab=[],
+                         max_features=500, ngram_range=(1, 1)):
     """
-   converts list of strings to a doc-term matrix
+   convert list of strings to a doc-term matrix
    returns term-counts matrix (sparse) and a list of feature names
 
    Args:

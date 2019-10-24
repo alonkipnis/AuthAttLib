@@ -29,7 +29,9 @@ class AuthorshipAttributionMulti(object):
                  vocab_size=100,
                  words_to_ignore=[],
                  ngram_range=(1, 1),
-                 stbl=True):
+                 stbl=True,
+                 flat=False
+                 ):
         """
         Args:
             data -- is a DataFrame with columns doc_id|author|text
@@ -50,6 +52,7 @@ class AuthorshipAttributionMulti(object):
         self._ngram_range = ngram_range  #: the n-gram range of text
         #: in the model.
         self._stbl = stbl  #:  type of HC statistic to use.
+        self._flat = flat
 
         if len(self._vocab) == 0:  #common vocabulary
             vocab = n_most_frequent_words(list(data.text),
@@ -92,6 +95,10 @@ class AuthorshipAttributionMulti(object):
         dtm, _ = to_docTermCounts(X,
                                   vocab=self._vocab,
                                   ngram_range=self._ngram_range)
+        if self._flat == True:
+            dtm = dtm.sum(0)
+            document_names = ["Sum of {} docs".format(len(document_names))]
+
         return DocTermTable(dtm,
                             feature_names=self._vocab,
                             document_names=document_names,
@@ -319,7 +326,6 @@ class AuthorshipAttributionMulti(object):
             HC, rank, feat = md.get_HC_rank_features(xdtb, LOO=LOO)
             chisq, chisq_pval = md.get_ChiSquare(xdtb)
             cosine = md.get_CosineSim(xdtb)
-            predict = self.predict(x)
             df = df.append(
                 {
                     'wrt_author': auth,
@@ -329,7 +335,6 @@ class AuthorshipAttributionMulti(object):
                     'rank': rank,
                     'feat': feat,
                     'cosine': cosine,
-                    'predict': predict,
                 },
                 ignore_index=True)
         return df
@@ -447,7 +452,9 @@ class AuthorshipAttributionMulti(object):
     def flatten_model(self) :
         """ Merge all documents to a single one
         """
-        # TODO ...
+        self._flat = True
+        for auth in self._AuthorModel :
+            self._AuthorModel[auth].collapse_dtm()
 
 
 class AuthorshipAttributionMultiBinary(object):

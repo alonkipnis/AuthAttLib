@@ -78,7 +78,7 @@ class DocTermTable(object):
         #pv_list = self.__per_doc_Pvals()
         self._internal_scores = []
         for row in self._dtm:
-            cnt = np.squeeze(np.array(row.todense()).astype(int))
+            cnt = np.squeeze(np.array(row.sum(0)).astype(int))
             pv = self._get_Pvals(cnt, within = True)
             hc, p_thr = hc_vals(pv, stbl=self._stbl, alpha=0.45)
             self._internal_scores += [hc]

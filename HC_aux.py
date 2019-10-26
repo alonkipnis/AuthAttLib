@@ -149,48 +149,6 @@ def two_sample_test(X, Y, alpha=0.45, min_counts=3):
     return counts
 
 
-def two_texts_test(text1, text2, vocab, alpha=0.45, min_counts=3):
-    # Input: text1, text2, are two iterables yielding strings
-    # Output: data frame: "term, n1, T1, n2, T2, pval, pval_z, hc"
-
-    counts = two_texts_pvals(text1, text2, vocab, min_counts=min_counts)
-
-    counts['z'] = counts.apply(
-        lambda row: z_score(row['n1'], row['n2'], row['T1'], row['T2']),
-        axis=1)
-
-    hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha)
-    counts['hc'] = hc_star
-    counts.loc[counts['pval'] > p_val_thresh, ('z')] = np.nan
-    counts.loc[np.isnan(counts['pval']), ('z')] = np.nan
-    return counts
-
-
-def two_texts_pvals(text1, text2, vocab, min_counts=3):
-    # Input: text1, text2, are two iterables yielding strings
-    # Output: data frame: "term, n1, T1, n2, T2, pval, pval_z, hc"
-
-    from sklearn.feature_extraction.text import CountVectorizer
-    tf_vectorizer = CountVectorizer(vocabulary=vocab)
-
-    tf1 = tf_vectorizer.fit_transform(text1)
-    tf2 = tf_vectorizer.fit_transform(text2)
-
-    counts = pd.DataFrame()
-    counts['term'] = vocab
-    counts['n1'] = np.array(tf1.sum(0))[0]
-    counts['n2'] = np.array(tf2.sum(0))[0]
-    counts['T1'] = counts['n1'].sum()
-    counts['T2'] = counts['n2'].sum()
-
-    #Joining unit1 and unit2 for the HC computation
-    counts['pval'] = counts.apply(lambda row: pval_bin(
-        row['n1'], row['n2'], row['T1'], row['T2'], min_counts=min_counts),
-                                  axis=1)
-
-    return counts
-
-
 def lo_terms_to_counts(term_df1, term_df2, lo_terms=[]):
     "unit1 and unit2 are dataframes with one term in each row"
     "lo_terms is a dataframe with at least one column 'token' (or None) "
@@ -220,10 +178,13 @@ def lo_terms_to_counts(term_df1, term_df2, lo_terms=[]):
 def two_list_test(term_cnt1,
                   term_cnt2,
                   lo_terms=pd.DataFrame(),
-                  alpha=0.35,
+                  alpha=0.45,
+                  stbl = True,
                   min_counts=3):
     #  HC test based on terms in lo_terms (or all terms otherwise)
-    #  Input: term_cnt1, term_cnt2 -- list of the form term-count (with possible multiplicities)
+    #  Input: term_cnt1, term_cnt2 -- list of the form term-count 
+    # (with possible multiplicities)
+
     # lump counts
     unit1 = term_cnt1.groupby(['term']).sum()
     unit2 = term_cnt2.groupby(['term']).sum()
@@ -252,7 +213,7 @@ def two_list_test(term_cnt1,
         lambda row: z_score(row['n1'], row['n2'], row['T1'], row['T2']),
         axis=1)
 
-    hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha)
+    hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha, stbl = stbl)
     counts['hc'] = hc_star
     counts.loc[counts['pval'] > p_val_thresh, ('z')] = np.nan
     counts.loc[np.isnan(counts['pval']), ('z')] = np.nan

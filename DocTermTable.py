@@ -352,7 +352,8 @@ class DocTermTable(object):
         if (LOO == False) or (within == True):
             lo_hc = self._internal_scores
             if len(lo_hc) > 0:
-                rank = np.mean(np.array(lo_hc) < HC)
+                s = np.sum(np.array(lo_hc) < HC)
+                rank = (s + within) / len(lo_hc)
             else:
                 rank = np.nan
             if (stbl != self._stbl):
@@ -362,12 +363,12 @@ class DocTermTable(object):
                      )
 
         elif LOO == True :
-            loo_Pvals = self.per_doc_Pvals_LOO(dtbl)[
-                1:]  #remove first item (corresponding to test sample)
+            loo_Pvals = self.per_doc_Pvals_LOO(dtbl)[1:]
+              #remove first item (corresponding to test sample)
 
             lo_hc = []
             if (len(loo_Pvals)) == 0:
-                raise ValueError("list of loo Pvals is empty")
+                raise ValueError("list of LOO Pvals is empty")
 
             for pv in loo_Pvals:
                 hc, _ = hc_vals(pv, stbl=stbl)

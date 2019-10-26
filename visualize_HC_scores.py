@@ -16,7 +16,7 @@ LIST_OF_COLORS = [
 ]
 
 def plot_author_pair(df, value = 'HC', wrt_authors = [],
-                     show_legend=True, title=""):
+                     show_legend=True):
     
     df1 = df.filter(['doc_id', 'author', 'wrt_author', value])\
             .pivot_table(index = ['doc_id','author'],
@@ -42,12 +42,11 @@ def plot_author_pair(df, value = 'HC', wrt_authors = [],
         # geom_text(aes(label = 'doc_id', check_overlap = True)) +
         xlab(wrt_authors[0]) + ylab(wrt_authors[1]) +
         scale_color_manual(values=color_map) +  #+ xlim(0,35) + ylim(0,35)
-        ggtitle(title) +
         theme(legend_title=element_blank(), legend_position='top'))
     return p
 
 def plot_author_pair_label(df, value = 'HC', wrt_authors = [],
-                     show_legend=True, title=""):
+                     show_legend=True):
     
     df1 = df.filter(['doc_id', 'author', 'wrt_author', value])\
             .pivot_table(index = ['doc_id','author'],
@@ -70,7 +69,6 @@ def plot_author_pair_label(df, value = 'HC', wrt_authors = [],
         geom_text(aes(label = 'doc_id', check_overlap = True)) +
         xlab(wrt_authors[0]) + ylab(wrt_authors[1]) +
         scale_color_manual(values=color_map) +  #+ xlim(0,35) + ylim(0,35)
-        ggtitle(title) +
         theme(legend_title=element_blank(), legend_position='top'))
     return p
 

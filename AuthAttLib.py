@@ -353,7 +353,7 @@ class AuthorshipAttributionMulti(object):
             doc_id -- the document identifyer.
             wrt_author -- author of the corpus against which the
                          document is tested.
-            HC, ChiSq, cosine -- HC score, Chi-Square score, a\\\\\\\\\nd cosine
+            HC, ChiSq, cosine -- HC score, Chi-Square score, and cosine
                                  similarity, respectively, between the 
                                  document and the corpus.
             rank -- the rank of the HC score compared to other documents 
@@ -449,7 +449,7 @@ class AuthorshipAttributionMulti(object):
              'chisq': chisq, 'chisq_pval' : chisq_pval,
             'cosine': cosine}
 
-    def flatten_model(self) :
+    def flatten(self) :
         """ Merge all documents to a single one
         """
         self._flat = True

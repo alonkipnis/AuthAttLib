@@ -305,7 +305,7 @@ def plot_author_pair_pval_col(df, wrt_authors=('Author1', 'Author2')):
     #ggtitle('Rank wrt each author ' + labels[0] + ' vs '+ labels[1])
     return p
 
-def plot_LDA(df, value, wrt_authors, test_author, sym = False) : 
+def plot_LDA(df, value, wrt_authors, sym = False) : 
 
     df1 = df.filter(['doc_id', 'author', 'wrt_author', value])\
             .pivot_table(index = ['doc_id','author'],
@@ -345,8 +345,7 @@ def plot_LDA(df, value, wrt_authors, test_author, sym = False) :
                         scale = pooled_std
                         )
     
-    df_plot = df1[df1.author.isin(wrt_authors) | (df1.author == test_author)]\
-              .melt(['t','author','doc_id'], [wrt_authors[0],wrt_authors[1]])
+    df_plot = df1.melt(['t','author','doc_id'], [wrt_authors[0],wrt_authors[1]])
  
     p = (ggplot(aes(x='t', y = 'value', color = 'author', fill = 'author', label = 'doc_id'),
                 data=df_plot) +

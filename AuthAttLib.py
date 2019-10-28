@@ -406,7 +406,7 @@ class AuthorshipAttributionMulti(object):
         md1 = self._AuthorModel[auth1]
         md2 = self._AuthorModel[auth2]
         _, _, feat = md1.get_HC_rank_features(md2, stbl=stbl)
-        print("Reducting to {} features".format(len(feat)))
+        print("Reducing to {} features...".format(len(feat)))
         self.reduce_features(list(feat))
         return self._vocab
 
@@ -496,7 +496,7 @@ class AuthorshipAttributionMultiBinary(object):
 
         print("Found {} author-pairs".format(len(lo_author_pairs)))
         for ap in lo_author_pairs:  # AuthorPair model for each pair
-            print("MultiBinaryAuthorModel: Creating model for {} vs {}"\
+            print("MultiBinaryAuthorModel: Creating model for {} vs {}..."\
                 .format(ap[0],ap[1]))
 
             data_pair = data[data.author.isin(list(ap))]
@@ -507,7 +507,7 @@ class AuthorshipAttributionMultiBinary(object):
                 words_to_ignore=words_to_ignore,
                 stbl=stbl)
             if reduce_features == True:
-                ap_model.reduce_features_from_model_pair(ap[0], ap[1])
+                ap_model.reduce_features_from_author_pair(ap[0], ap[1])
             self._AuthorPairModel[ap] = ap_model
 
     def predict(self, x, method='HC'):

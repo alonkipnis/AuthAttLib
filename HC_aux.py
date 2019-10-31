@@ -20,9 +20,9 @@ def hc_vals(pv, alpha=0.45, stbl=True):
         ps = pv[ps_idx]  #sorted pvals
 
         if stbl:
-            z = (uu - ps) / np.sqrt(uu * (1 - uu) + 1e-10) * np.sqrt(n)
+            z = (uu - ps) / np.sqrt(uu * (1 - uu) + 1e-20) * np.sqrt(n)
         else:
-            z = (uu - ps) / np.sqrt(ps * (1 - ps) + 1e-10) * np.sqrt(n)
+            z = (uu - ps) / np.sqrt(ps * (1 - ps) + 1e-20) * np.sqrt(n)
 
         i_lim_up = np.maximum(int(np.floor(alpha * n + 0.5)), 1)
         try:
@@ -32,11 +32,8 @@ def hc_vals(pv, alpha=0.45, stbl=True):
 
         i_lim_up = max(i_lim_low + 1, i_lim_up)
 
-        i_max = np.argmax(z[:i_lim_up])
-
         i_max_star = np.argmax(z[i_lim_low:i_lim_up]) + i_lim_low
 
-        z_max = z[i_max]
         z_max_star = z[i_max_star]
 
         hc_star = z[i_max_star]
@@ -74,17 +71,22 @@ def hc_vals_full(pv, alpha=0.45):
         #i_max = np.argmax(z[:i_lim_up])
         i_lim_up = max(i_lim_low + 1, i_lim_up)
 
-        i_max_star = np.argmax(z[i_lim_low:i_lim_up]) + i_max_star
+        i_max_star = np.argmax(z[i_lim_low:i_lim_up]) + i_lim_low
 
         hc_star = z[i_max_star]
         p_star = ps[i_lim_low]
 
+        p_star_full = ps[np.argmax(z[:i_lim_up])]
+
         #i_max = np.argmax(z_stbl[:i_lim_up])
         i_max_star = np.argmax(z_stbl[i_lim_low:i_lim_up]) + i_lim_low
+
+        p_star_full_stbl = ps[np.argmax(z_stbl[:i_lim_up])]
 
         hc_star_stbl = z_stbl[i_max_star]
 
         p_star_stbl = ps[i_max_star]
+
 
     import pandas as pd
     df = pd.DataFrame({
@@ -94,6 +96,8 @@ def hc_vals_full(pv, alpha=0.45):
         'u': uu,
         'HC': hc_star,
         'HC_stbl': hc_star_stbl,
+        'p_star_full' : p_star_full,
+        'p_star_full_stbl' : p_star_full_stbl,
         'p_star': p_star,
         'p_star_stbl': p_star_stbl
     })
@@ -126,7 +130,7 @@ def z_prop_test(n1, n2, T1, T2):
     return 2 * norm.cdf(-np.abs(z))
 
 
-def two_sample_test(X, Y, alpha=0.45, min_counts=3):
+def two_sample_test(X, Y, alpha=0.45, stbl=True,min_counts=3):
     # Input: X, Y, are two lists of integers of equal length :
     # Output: data frame: "X, Y, T1, n2, T2, pval, pval_z, hc"
     counts = pd.DataFrame()
@@ -142,7 +146,7 @@ def two_sample_test(X, Y, alpha=0.45, min_counts=3):
         lambda row: z_score(row['n1'], row['n2'], row['T1'], row['T2']),
         axis=1)
 
-    hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha)
+    hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha, stbl=stbl)
     counts['hc'] = hc_star
     counts.loc[counts['pval'] > p_val_thresh, ('z')] = np.nan
     counts.loc[np.isnan(counts['pval']), ('z')] = np.nan

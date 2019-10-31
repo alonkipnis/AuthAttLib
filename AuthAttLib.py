@@ -150,12 +150,13 @@ class AuthorshipAttributionMulti(object):
 
         for i, auth in enumerate(self._AuthorModel):
             am = self._AuthorModel[auth]
-            score, rank, feat = am.get_HC_rank_features(Xdtb, 
+            HC, rank, feat = am.get_HC_rank_features(Xdtb, 
                                     features_to_mask = features_to_mask,
                                     LOO=LOO)
             chisq, chisq_pval = am.get_ChiSquare(Xdtb)
             cosine = am.get_CosineSim(Xdtb)
 
+            score = HC
             if method == 'rank':
                 score = rank
             elif method == 'cosine':

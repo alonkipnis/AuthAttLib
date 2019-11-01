@@ -7,6 +7,7 @@ from tqdm import *
 import scipy
 from scipy.spatial.distance import cosine
 from scipy.stats import chi2_contingency
+from scipy.stats import ks_2samp
 
 import re
 from sklearn.feature_extraction.text import CountVectorizer
@@ -31,6 +32,12 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
         chisq, pval, dof, exp = chi2_contingency(obs[:,obs.sum(0)!=0],
                                         lambda_=lambda_)
         return chisq - dof, pval
+
+def two_sample_KS(c1, c2) :
+    """ 2-sample Kolmogorov-Smirnov test
+    """
+    return ks_2samp(c1, c2)
+
 
 def cosine_sim(c1, c2):
     """

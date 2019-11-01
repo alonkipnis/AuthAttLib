@@ -302,12 +302,22 @@ class DocTermTable(object):
                                     )
             return new_table  
 
-    def get_ChiSquare(self, dtbl, within=False):
+    def get_ChiSquare(self, dtbl, within=False, lambda_ = None):
         """ ChiSquare score with respect to another DocTermTable 
         object 'dtbl'
         """
         cnt0, cnt1 = self._get_counts(dtbl, within=within)
-        return two_sample_chi_square(cnt0, cnt1)
+        return two_sample_chi_square(cnt0, cnt1, lambda_ = lambda_)
+
+    def get_KS(self, dtbl, within=False):
+        """ Kolmogorov-Smirnov test with respect to another DocTermTable 
+        object 'dtbl'
+
+        Return:
+            statistics, pvalue
+        """
+        cnt0, cnt1 = self._get_counts(dtbl, within=within)
+        return two_sample_KS(cnt0, cnt1)
 
     def get_CosineSim(self, dtbl, within=False):
         """ Cosine similarity with respect to another DocTermTable 

@@ -186,3 +186,35 @@ def plot_LDA(df, value, wrt_authors, sym = False) :
                                'scale' : pooled_std}, color = LIST_OF_COLORS[1])
          + ylab('prob') + xlab('projected score'))
     return p
+
+def plot_col(df, value, sign, wrt_authors = []) :
+    """ Bar plot of 'value' by term
+
+    Parameters:
+        df -- DataFrame with columns 'term'|value|'sign'
+        value -- amplitude and order of columns
+        sign -- real number represents which author use term more frequently
+        wrt_authors -- name of two authors (only needed to display legend)
+
+    """
+    df = df.sort_values(value).reset_index()
+    df['term'] = pd.Categorical(df['term'], categories=df['term'].values[::-1], ordered=True)
+    
+    if len(wrt_authors) == 0 :
+        df.loc[:,'used more by'] = True
+        show_legend = False
+    else :
+        df.loc[:,'used more by'] = df[sign].apply(lambda x : wrt_authors[0] if x>0 else wrt_authors[1])
+        show_legend = True
+
+    p = (ggplot(aes(x='term', y=value, fill='used more by'),
+                data=df.dropna()) +
+         geom_bar(position='dodge', stat="identity", show_legend=show_legend) +
+         scale_fill_manual(values = LIST_OF_COLORS) +
+         coord_flip() + 
+         ylab(value) +
+         xlab('') +
+         theme(legend_position='top')
+        )        
+    return p
+

@@ -101,7 +101,7 @@ def n_most_frequent_words(texts, n, words_to_ignore=[], ngram_range=(1, 1)):
 
 def frequent_words_tfidf(texts, no_words, words_to_ignore=[]):
     """
-        Returns the n = no_words with LOWEST tf-idf score.
+        Returns no_words with LOWEST tf-idf score.
         Useful in removing proper names and rare words. 
     """
 

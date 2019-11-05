@@ -399,6 +399,14 @@ class AuthorshipAttributionMulti(object):
                     ignore_index=True)
         return df
 
+    def two_author_test(self, auth1, auth2, stbl=None, within=False) :
+        return self._AuthorModel[auth1]\
+                  .two_table_test(self._AuthorModel[auth2],
+                   stbl = stbl,
+                   within=within
+                   )
+        
+
     def reduce_features(self, new_feature_set):
         """
             Update the model to a new set of features. 
@@ -423,8 +431,8 @@ class AuthorshipAttributionMulti(object):
     def get_discriminating_features(self, x,
                              wrt_authors = [], stbl=None) :
         """ 
-        Find list of features discriminating x and all
-        authors in a list.
+        Find list of features discriminating text x and all
+        authors in the list.
         
         Args:
             x -- input text (list of strings)
@@ -459,12 +467,7 @@ class AuthorshipAttributionMulti(object):
              'chisq': chisq, 'chisq_pval' : chisq_pval,
             'cosine': cosine}
 
-    def flatten(self) :
-        """ Merge all documents to a single one
-        """
-        self._flat = True
-        for auth in self._AuthorModel :
-            self._AuthorModel[auth].collapse_dtm()
+    
 
 
 class AuthorshipAttributionMultiBinary(object):

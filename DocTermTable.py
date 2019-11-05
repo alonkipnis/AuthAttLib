@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 from scipy.sparse import vstack
 
-from HC_aux import hc_vals, two_counts_pvals
+from HC_aux import hc_vals, two_counts_pvals, two_sample_test
 
 from utils import *
 
@@ -132,7 +132,7 @@ class DocTermTable(object):
             pv = two_counts_pvals(cnt1, cnt2).pval
         else:
             pv = two_counts_pvals(cnt1, cnt0).pval
-        return pv.values
+        return pv.values 
 
     def _get_counts(self, dtbl, within=False) :
         """ Returns two list of counts, one from an 
@@ -167,10 +167,9 @@ class DocTermTable(object):
                 raise ValueError("'within == True' is invalid")
         return cnt0, cnt1
 
-
     def get_Pvals(self, dtbl):
         """ return a list of p-values of another DocTermTable with 
-        respect 'self' doc-term table.
+        respect to 'self' doc-term table.
 
         Args: 
             dtbl -- DocTermTable object with respect to which to
@@ -187,6 +186,19 @@ class DocTermTable(object):
             print("Completed.")
 
         return self._get_Pvals(dtbl.get_counts())
+
+    def two_table_test(self, dtbl, within=False, stbl=None) :
+        """counts, p-values, and HC with 
+        respect to another DocTermTable
+        """
+        if stbl == None :
+            stbl = self._stbl
+
+        cnt0, cnt1 = self._get_counts(dtbl, within=within)
+        df = two_sample_test(cnt0, cnt1, stbl=stbl)
+        df.loc[:,'feat'] = self._feature_names
+        return df
+
 
     def per_doc_Pvals_LOO(self, dtbl):
         """ return a list of internal pvals after adding another 

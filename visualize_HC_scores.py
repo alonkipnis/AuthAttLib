@@ -214,6 +214,7 @@ def plot_col(df, value, sign, wrt_authors = []) :
          coord_flip() + 
          ylab(value) +
          xlab('') +
+         scale_y_log10() +
          theme(legend_position='top')
         )        
     return p

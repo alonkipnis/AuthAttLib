@@ -14,7 +14,6 @@ def remove_parts_of_speach(text,
     # 'NNPS' -- proper noun, plural 
     # 'CD' -- cardinal digit
     # 'PRP' -- personal pronoun
-    # 'PRP' -- personal pronoun
     # 'PRP$' -- posessive pronoun
     #stem and remove numbers
     text_pos = nltk.pos_tag(nltk.word_tokenize(text))
@@ -26,10 +25,6 @@ def remove_parts_of_speach(text,
     else :
         lemmas = [w[0] for w in text_pos if \
                   w[1] not in to_remove]
-        #text = re.sub("[- ]"," ", text)
-    #text = re.sub("[^a-zA-Z ]","",text)
-    #stemmer = SnowballStemmer('english')
-    #lemmas = [stemmer.stem(w) for w in text.split() if not re.match(r'[1-9]+',w)]
     return " ".join(lemmas)
 
 def html_to_text(text_in_html) :

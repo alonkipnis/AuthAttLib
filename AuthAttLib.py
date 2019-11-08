@@ -525,11 +525,12 @@ class AuthorshipAttributionMultiBinary(object):
 
     def predict(self, x, method='HC'):
         def predict_max(df1):
-            "Whoever win most"
+            # whoever has more votes or <UNK> in the 
+            # case of a draw
             cnt = df1.pred.value_counts()
             imx = cnt.values == cnt.values.max()
-            if sum(imx) == 1:
-                return cnt.index[imx][0]
+            if sum(imx) == 1: 
+                return cnt.index[imx][0] 
             else: #in the case of a draw
                 return '<UNK>'
 

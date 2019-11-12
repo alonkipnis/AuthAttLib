@@ -8,7 +8,7 @@
 - HC_aux.py -- auxiliary functions to evaluate Higher Criticism tests 
 
 In order to use AuthorshipAttributionMulti and AuthorshipAttributionMultiBinary arrange input data in a pandas dataframe with columns 
-> <author>, <doc_id>, <text> 
+> <author>|<doc_id>|<text> 
 - author is the name of the class document is assoicated with.
 - doc_id is a unique document identifyer.
 - text contains the text (content) of the document. 

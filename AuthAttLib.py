@@ -93,16 +93,17 @@ class AuthorshipAttributionMulti(object):
         """
 
         dtm, _ = to_docTermCounts(X,
-                                  vocab=self._vocab,
-                                  ngram_range=self._ngram_range)
+                            vocab=self._vocab,
+                            ngram_range=self._ngram_range)
+
         if self._flat == True:
             dtm = dtm.sum(0)
             document_names = ["Sum of {} docs".format(len(document_names))]
 
         return DocTermTable(dtm,
-                            feature_names=self._vocab,
-                            document_names=document_names,
-                            stbl=self._stbl)
+                    feature_names=self._vocab,
+                    document_names=document_names,
+                    stbl=self._stbl)
 
     def re_compute_author_models(self):
         """ compute author models after a change in vocab """
@@ -234,8 +235,8 @@ class AuthorshipAttributionMulti(object):
         wrt_authors -- subset of the authors in the model with respect
                 to which the scores of each document are evaluated.
                 If empty, evaluate with respect to all authors.
-        LOO -- indicates whether to compute rank in a leave-of-out mode
-            It leads to more accurate rank-based testing but require more 
+        LOO -- indicates whether to compute rank in a leave-of-out mode.
+            This mode provides more accurate rank-based testing but require more 
             computations.
 
         Returns: 
@@ -267,7 +268,7 @@ class AuthorshipAttributionMulti(object):
                     dtbl = md1.get_doc_as_table(dn)
                     if auth0 == auth1:
                         HC, rank, feat = md0.get_HC_rank_features(
-                            dtbl,LOO=LOO,within=True
+                            dtbl, LOO=LOO, within=True
                             )
                         chisq, chisq_pval = md0.get_ChiSquare(dtbl,
                                                          within=True)
@@ -421,20 +422,6 @@ class AuthorshipAttributionMulti(object):
         self._vocab = new_feature_set
         self.re_compute_author_models()
 
-    def reduce_features_from_author_pair(self, auth1, auth2, stbl=None):
-        """
-            Find list of features (tokens) discriminating auth1 and auth2
-            Reduce model to those features. 
-            'auth1' and 'auth2' are keys within _AuthorModel
-            return new list of features
-        """
-        md1 = self._AuthorModel[auth1]
-        md2 = self._AuthorModel[auth2]
-        _, _, feat = md1.get_HC_rank_features(md2, stbl=stbl)
-        print("Reducing to {} features...".format(len(feat)))
-        self.reduce_features(list(feat))
-        return self._vocab
-
     def get_discriminating_features(self, x,
                              wrt_authors = [], stbl=None) :
         """ 
@@ -530,6 +517,12 @@ class AuthorshipAttributionMultiBinary(object):
                 print("Reduced to {} features...".format(len(feat)))
                 
     def reduce_features_for_author_pair(self, auth_pair) :
+        """
+            Find list of features (tokens) discriminating two authors
+            Reduce model to those features. 
+            'auth_pair' is a key in self._AuthorPairModel
+            returns the new list of features
+        """
         ap_model = self._AuthorPairModel[auth_pair]
 
         md1 = ap_model._AuthorModel[auth_pair[0]]

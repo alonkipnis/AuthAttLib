@@ -374,8 +374,8 @@ class DocTermTable(object):
         if (LOO == False) or (within == True):
             lo_hc = self._internal_scores
             if len(lo_hc) > 0:
-                s = np.sum(np.array(lo_hc) < HC)
-                rank = (s + within) / len(lo_hc)
+                s = np.sum(np.array(lo_hc) < HC) + within
+                rank = s / (len(lo_hc) + 1 - within)
             else:
                 rank = np.nan
             if (stbl != self._stbl):
@@ -397,7 +397,8 @@ class DocTermTable(object):
                 lo_hc += [hc]
 
             if len(lo_hc) > 0:
-                rank = np.mean(np.array(lo_hc) < HC)
+                s = np.sum(np.array(lo_hc) < HC) + within
+                rank = s / (len(lo_hc) + 1 - within)
             else:
                 rank = np.nan
 

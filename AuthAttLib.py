@@ -120,7 +120,8 @@ class AuthorshipAttributionMulti(object):
 
         Args:
             x -- string representing the test document 
-            method -- designate which score to use
+            method -- designate which score to use. Supported method:
+            'HC', 'HC_rank', 'chisq', 'chisq_pval', 'cosine'
             unk_thresh -- minimal score below which the text is 
             attributed to one of the authors in the model and not assigned
             the label '<UNK>'.
@@ -150,21 +151,25 @@ class AuthorshipAttributionMulti(object):
 
         for i, auth in enumerate(self._AuthorModel):
             am = self._AuthorModel[auth]
-            HC, rank, feat = am.get_HC_rank_features(Xdtb, 
-                                    features_to_mask = features_to_mask,
-                                    LOO=LOO)
-            chisq, chisq_pval = am.get_ChiSquare(Xdtb)
-            cosine = am.get_CosineSim(Xdtb)
-
-            score = HC
-            if method == 'rank':
-                score = rank
+            
+            if method == 'HC' or method == 'HC_rank':
+                HC, rank, feat = am.get_HC_rank_features(Xdtb, 
+                        features_to_mask = features_to_mask,
+                                LOO=LOO)
+                score = HC
+                if method == 'HC' :
+                    score = HC
+                else :
+                    score = rank
             elif method == 'cosine':
+                cosine = am.get_CosineSim(Xdtb)
                 score = cosine
-            elif method == 'chisq' :
-                score = chisq
-            elif method == 'chisq_pval' :
-                score = 1 - chisq_pval
+            elif method == 'chisq' or method == 'chisq_pval' :
+                chisq, chisq_pval = am.get_ChiSquare(Xdtb)
+                if method == 'chisq' :
+                    score = chisq
+                else :
+                    score = 1 - chisq_pval
 
             if score < min_score: # find new minimum
                 margin = min_score / score
@@ -207,6 +212,7 @@ class AuthorshipAttributionMulti(object):
                             'author': auth1,
                             'wrt_author': auth0,
                             'HC': HC,
+                            'HC_rank' : rank,
                             'chisq': chisq,
                             'chisq_pval' : chisq_pval,
                             'cosine': cosine,
@@ -286,10 +292,11 @@ class AuthorshipAttributionMulti(object):
                             'wrt_author': auth0,
                             'HC': HC,
                             'chisq': chisq,
+                            'chisq_pval' : chisq_pval,
                             'chisq23' : chisq23,
                             'KS_pval' : KS_pval,
                             'cosine': cosine,
-                            'rank': rank,
+                            'HC_rank': rank,
                             'feat': list(feat)
                         },
                         ignore_index=True)
@@ -342,7 +349,7 @@ class AuthorshipAttributionMulti(object):
                     'HC': HC,
                     'chisq': chisq,
                     'chisq_pval' : chisq_pval,
-                    'rank': rank,
+                    'HC_rank': rank,
                     'feat': feat,
                     'cosine': cosine,
                 },
@@ -393,7 +400,7 @@ class AuthorshipAttributionMulti(object):
                         'chisq': chisq,
                         'chisq_pval' : chisq_pval,
                         'cosine': cosine,
-                        'rank': rank,
+                        'HC_rank': rank,
                         'feat': list(feat)
                     },
                     ignore_index=True)
@@ -468,8 +475,6 @@ class AuthorshipAttributionMulti(object):
             'cosine': cosine}
 
     
-
-
 class AuthorshipAttributionMultiBinary(object):
     """ Use pair-wise tests to determine most likely author. 
         It does so by creating AuthorshipAttributionMulti object for each 
@@ -492,17 +497,17 @@ class AuthorshipAttributionMultiBinary(object):
         # vocab_size is an integer controlling the size of vocabulary
 
         self._AuthorPairModel = {}
+        self._stbl = stbl
 
-        if global_vocab == True:
-            if len(vocab) == 0:
-                #get top vocab_size terms
-                vocab = n_most_frequent_words(list(data.text),
-                                              n=vocab_size,
-                                              words_to_ignore=words_to_ignore,
-                                              ngram_range=ngram_range)
-        else:
-            vocab = []
-
+        if len(vocab) == 0 :
+            if global_vocab == True:
+                if len(vocab) == 0:
+                    #get top vocab_size terms
+                    vocab = n_most_frequent_words(list(data.text),
+                                                  n=vocab_size,
+                                                  words_to_ignore=words_to_ignore,
+                                                  ngram_range=ngram_range)
+            
         lo_authors = pd.unique(data.author)  #all authors
         lo_author_pairs = [(auth1, auth2) for auth1 in lo_authors\
                              for auth2 in lo_authors if auth1 < auth2 ]
@@ -520,8 +525,19 @@ class AuthorshipAttributionMultiBinary(object):
                 words_to_ignore=words_to_ignore,
                 stbl=stbl)
             if reduce_features == True:
-                ap_model.reduce_features_from_author_pair(ap[0], ap[1])
-            self._AuthorPairModel[ap] = ap_model
+                self._AuthorPairModel[ap] = ap_model
+                feat = self.reduce_features_for_author_pair(ap)
+                print("Reduced to {} features...".format(len(feat)))
+                
+    def reduce_features_for_author_pair(self, auth_pair) :
+        ap_model = self._AuthorPairModel[auth_pair]
+
+        md1 = ap_model._AuthorModel[auth_pair[0]]
+        md2 = ap_model._AuthorModel[auth_pair[1]]
+        
+        _, _, feat = md1.get_HC_rank_features(md2, stbl=self._stbl)
+        ap_model.reduce_features(list(feat))
+        return ap_model._vocab
 
     def predict(self, x, method='HC'):
         def predict_max(df1):

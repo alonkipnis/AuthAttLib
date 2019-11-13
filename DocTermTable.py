@@ -372,9 +372,10 @@ class DocTermTable(object):
         feat = np.array(self._feature_names)[pvals < p_thr]
 
         if (LOO == False) or (within == True):
+            # internal pvals are evaluated in a LOO manner
             lo_hc = self._internal_scores
             if len(lo_hc) > 0:
-                s = np.sum(np.array(lo_hc) < HC) + within
+                s = np.sum(np.array(lo_hc) < HC) 
                 rank = s / (len(lo_hc) + 1 - within)
             else:
                 rank = np.nan
@@ -397,7 +398,7 @@ class DocTermTable(object):
                 lo_hc += [hc]
 
             if len(lo_hc) > 0:
-                s = np.sum(np.array(lo_hc) < HC) + within
+                s = np.sum(np.array(lo_hc) < HC) 
                 rank = s / (len(lo_hc) + 1 - within)
             else:
                 rank = np.nan

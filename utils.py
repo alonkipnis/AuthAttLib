@@ -22,7 +22,7 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
     
     Returns:
         chisq -- centralized chi-square score (score - dof)
-        pval -- p-value
+        log of pvalue -- p-value
     """
     
     if (sum(c1) == 0) or (sum(c2) == 0) :
@@ -31,7 +31,7 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
         obs = np.array([c1, c2])
         chisq, pval, dof, exp = chi2_contingency(obs[:,obs.sum(0)!=0],
                                         lambda_=lambda_)
-        return chisq - dof, pval
+        return chisq - dof, np.log(pval)
 
 def two_sample_KS(c1, c2) :
     """ 2-sample Kolmogorov-Smirnov test

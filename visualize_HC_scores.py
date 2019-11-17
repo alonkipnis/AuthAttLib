@@ -1,6 +1,5 @@
 from plotnine import *
 import numpy as np
-import matplotlib.colors as mcolors
 import pandas as pd
 import warnings
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
@@ -219,3 +218,16 @@ def plot_col(df, value, sign, wrt_authors = []) :
         )        
     return p
 
+from plotnine import *
+def visualize_HCz(pvals) : 
+    from HC_aux import hc_vals_full
+    
+    n = len(pvals)
+    df = hc_vals_full(pvals)
+
+    p = (ggplot(aes(x = 'u', y = 'z_stbl'), data = df) + geom_smooth(color = 'blue')
+     + geom_smooth(aes(y = 'z'), color = 'green')
+     + geom_vline(xintercept = df_pvals.u[df.z_stbl.idxmax()], color = 'blue')
+     + geom_vline(xintercept = df_pvals.u[df[df.pval > 1/n].z.idxmax()], color = 'green')
+    )
+    return p 

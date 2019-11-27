@@ -3,7 +3,6 @@ import scipy
 from scipy.sparse import vstack
 
 from HC_aux import hc_vals, two_counts_pvals, two_sample_test
-
 from utils import *
 
 def change_dtm_dictionary(dtm, old_vocab, new_vocab):

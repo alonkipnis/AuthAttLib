@@ -10,22 +10,31 @@ from nltk.stem import WordNetLemmatizer
 def remove_parts_of_speach(text, 
                         to_remove = ('NNP', 'NNPS', 'CD'),
                         lemmatize = True) :
+
     # 'NNP'-- proper noun, singluar
     # 'NNPS' -- proper noun, plural 
     # 'CD' -- cardinal digit
     # 'PRP' -- personal pronoun
     # 'PRP$' -- posessive pronoun
-    #stem and remove numbers
+    # stem and remove numbers
     text_pos = nltk.pos_tag(nltk.word_tokenize(text))
 
     if lemmatize :
         lemmatizer = WordNetLemmatizer() 
         lemmas = [lemmatizer.lemmatize(w[0]) for w in text_pos if \
-                  w[1] not in to_remove]
+                  w[1] not in to_remove and 
+                  (len(re.findall('[0-9]',w[0])) == 0)]
     else :
         lemmas = [w[0] for w in text_pos if \
-                  w[1] not in to_remove]
+                  w[1] not in to_remove and
+                (len(re.findall('[0-9]',w[0])) == 0)
+                  ]
     return " ".join(lemmas)
+
+def cleanhtml(raw_html):
+  cleanr = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+  cleantext = re.sub(cleanr, '', raw_html)
+  return cleantext
 
 def html_to_text(text_in_html) :
     soup = bs4.BeautifulSoup(text_in_html, "html.parser")

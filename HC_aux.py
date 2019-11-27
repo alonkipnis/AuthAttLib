@@ -14,7 +14,7 @@ def hc_vals(pv, alpha=0.45, stbl=True):
     [2] Donoho, D. L. and Jin, J. "Higher critcism thresholding: Optimal 
     feature selection when useful features are rare and weak", proceedings
     of the national academy of sciences, 2008.
-     )
+     )s
 
     Parameters:
         pv -- list of p-values. P-values that are np.nan are exluded.
@@ -193,3 +193,44 @@ def two_counts_pvals(c1, c2, min_counts=3):
                                   axis=1)
     return counts
 
+def two_list_test(term_cnt1,
+                  term_cnt2,
+                  lo_terms=pd.DataFrame(),
+                  alpha=0.35,
+                  min_counts=3,
+                  stbl=True):
+    #  HC test based on terms in lo_terms (or all terms otherwise)
+    #  Input: term_cnt1, term_cnt2 -- list of the form term-count (with possible multiplicities)
+    # lump counts
+    unit1 = term_cnt1.groupby(['term']).sum()
+    unit2 = term_cnt2.groupby(['term']).sum()
+
+    #if list of terms is not provided, use all terms
+    if lo_terms.shape[0] == 0:
+        ls = unit1.index.tolist() + unit2.index.tolist()
+        lo_terms = pd.DataFrame({'term': list(set(ls))})
+
+    #merge based on list of terms
+    lo_terms = lo_terms.filter(['term'])
+    unit1_red = unit1.merge(lo_terms, how='right', on=['term']).fillna(0)
+    unit2_red = unit2.merge(lo_terms, how='right', on=['term']).fillna(0)
+
+    counts = pd.DataFrame()
+    counts['term'] = unit1_red.term
+    counts['n1'] = unit1_red.n
+    counts['n2'] = unit2_red.n
+    counts['T1'] = counts['n1'].sum()
+    counts['T2'] = counts['n2'].sum()
+
+    counts['pval'] = counts.apply(lambda row: pval_bin(
+        row['n1'], row['n2'], row['T1'], row['T2'], min_counts=min_counts),
+                                  axis=1)
+    counts['z'] = counts.apply(
+        lambda row: z_score(row['n1'], row['n2'], row['T1'], row['T2']),
+        axis=1)
+
+    hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha, stbl=stbl)
+    counts['hc'] = hc_star
+    counts.loc[counts['pval'] > p_val_thresh, ('z')] = np.nan
+    counts.loc[np.isnan(counts['pval']), ('z')] = np.nan
+    return counts

@@ -1,9 +1,7 @@
 import pandas as pd
 import numpy as np
 from tqdm import *
-
 from utils import to_docTermCounts, n_most_frequent_words
-
 from DocTermTable import DocTermTable
 
 class AuthorshipAttributionMulti(object):
@@ -105,7 +103,7 @@ class AuthorshipAttributionMulti(object):
                     document_names=document_names,
                     stbl=self._stbl)
 
-    def re_compute_author_models(self):
+    def compute_author_models(self):
         """ compute author models after a change in vocab """
 
         for auth in self._AuthorModel:
@@ -225,6 +223,68 @@ class AuthorshipAttributionMulti(object):
                         ignore_index=True)
         return df
 
+    def get_doc_stats(self, doc_id, author, wrt_authors = [], LOO = False) :
+        """ stats wrt to all authors in list wrt_authors of 
+            a single document within the model. 
+         """
+
+        try :
+            md0 = self._AuthorModel[author]
+            lo_docs = md0.get_document_names()
+            i = lo_docs[doc_id]
+        except ValueError:
+            print("Cannot find document {} by author {}".format(doc_id,author))
+            return None
+
+        dtbl = md0.get_doc_as_table(doc_id)
+
+        df = pd.DataFrame()
+
+        if len(wrt_authors) == 0:
+            # evaluate with resepct to all authors in the model
+            wrt_authors = self._AuthorModel
+
+        for auth1 in wrt_authors:
+            md1 = self._AuthorModel[auth1]
+                
+            if author == auth1:
+                HC, rank, feat = md1.get_HC_rank_features(
+                    dtbl, LOO=LOO, within=True
+                    )
+                chisq, chisq_pval = md1.get_ChiSquare(dtbl,
+                                                 within=True)
+                chisq23, chisq23_pval = md1.get_ChiSquare(dtbl,
+                    within=True,
+                    lambda_="cressie-read")
+                KS, KS_pval = md1.get_KS(dtbl, within = True)
+                cosine = md0.get_CosineSim(dtbl, within=True)
+            else:
+                HC, rank, feat = md1.get_HC_rank_features(
+                    dtbl, LOO=LOO)
+                chisq, chisq_pval = md1.get_ChiSquare(dtbl)
+
+                chisq23, chisq23_pval = md1.get_ChiSquare(dtbl,
+                    lambda_="cressie-read")
+                KS, KS_pval = md0.get_KS(dtbl)
+                cosine = md0.get_CosineSim(dtbl)
+            df = df.append(
+                {
+                    'doc_id': doc_id,
+                    'author': author,
+                    'wrt_author': auth1,
+                    'HC': HC,
+                    'chisq': chisq,
+                    'chisq_pval' : chisq_pval,
+                    'chisq23' : chisq23,
+                    'KS_pval' : KS_pval,
+                    'cosine': cosine,
+                    'HC_rank': rank,
+                    'feat': list(feat)
+                },
+                ignore_index=True)
+        return df
+
+
     def internal_stats(self, wrt_authors=[], LOO=False):
         """
         Compute scores of each document with respect to the corpus of
@@ -255,52 +315,59 @@ class AuthorshipAttributionMulti(object):
 
         df = pd.DataFrame()
 
-        if len(wrt_authors) == 0:
+        #if len(wrt_authors) == 0:
             # evaluate with resepct to all authors in the model
-            wrt_authors = self._AuthorModel
+         #   wrt_authors = self._AuthorModel
 
-        for auth0 in tqdm(wrt_authors):
+        for auth0 in self._AuthorModel :
+            #tqdm(wrt_authors):
             md0 = self._AuthorModel[auth0]
-            for auth1 in self._AuthorModel:
-                md1 = self._AuthorModel[auth1]
-                lo_docs = md1.get_document_names()
-                for dn in lo_docs:
-                    dtbl = md1.get_doc_as_table(dn)
-                    if auth0 == auth1:
-                        HC, rank, feat = md0.get_HC_rank_features(
-                            dtbl, LOO=LOO, within=True
-                            )
-                        chisq, chisq_pval = md0.get_ChiSquare(dtbl,
-                                                         within=True)
-                        chisq23, chisq23_pval = md0.get_ChiSquare(dtbl,
-                            within=True,
-                            lambda_="cressie-read")
-                        KS, KS_pval = md0.get_KS(dtbl, within = True)
-                        cosine = md0.get_CosineSim(dtbl, within=True)
-                    else:
-                        HC, rank, feat = md0.get_HC_rank_features(
-                            dtbl, LOO=LOO)
-                        chisq, chisq_pval = md0.get_ChiSquare(dtbl)
+            #for auth1 in self._AuthorModel:
+            #    md1 = self._AuthorModel[auth1]
+            lo_docs = md0.get_document_names()
+            for dn in lo_docs:
+                df = df.append(self.get_doc_stats(dn, auth0,
+                 wrt_authors = wrt_authors,
+                  LOO = LOO), ignore_index=True)
 
-                        chisq23, chisq23_pval = md0.get_ChiSquare(dtbl,
-                            lambda_="cressie-read")
-                        KS, KS_pval = md0.get_KS(dtbl)
-                        cosine = md0.get_CosineSim(dtbl)
-                    df = df.append(
-                        {
-                            'doc_id': dn,
-                            'author': auth1,
-                            'wrt_author': auth0,
-                            'HC': HC,
-                            'chisq': chisq,
-                            'chisq_pval' : chisq_pval,
-                            'chisq23' : chisq23,
-                            'KS_pval' : KS_pval,
-                            'cosine': cosine,
-                            'HC_rank': rank,
-                            'feat': list(feat)
-                        },
-                        ignore_index=True)
+                """
+                dtbl = md1.get_doc_as_table(dn)
+                if auth0 == auth1:
+                    HC, rank, feat = md0.get_HC_rank_features(
+                        dtbl, LOO=LOO, within=True
+                        )
+                    chisq, chisq_pval = md0.get_ChiSquare(dtbl,
+                                                     within=True)
+                    chisq23, chisq23_pval = md0.get_ChiSquare(dtbl,
+                        within=True,
+                        lambda_="cressie-read")
+                    KS, KS_pval = md0.get_KS(dtbl, within = True)
+                    cosine = md0.get_CosineSim(dtbl, within=True)
+                else:
+                    HC, rank, feat = md0.get_HC_rank_features(
+                        dtbl, LOO=LOO)
+                    chisq, chisq_pval = md0.get_ChiSquare(dtbl)
+
+                    chisq23, chisq23_pval = md0.get_ChiSquare(dtbl,
+                        lambda_="cressie-read")
+                    KS, KS_pval = md0.get_KS(dtbl)
+                    cosine = md0.get_CosineSim(dtbl)
+                df = df.append(
+                    {
+                        'doc_id': dn,
+                        'author': auth1,
+                        'wrt_author': auth0,
+                        'HC': HC,
+                        'chisq': chisq,
+                        'chisq_pval' : chisq_pval,
+                        'chisq23' : chisq23,
+                        'KS_pval' : KS_pval,
+                        'cosine': cosine,
+                        'HC_rank': rank,
+                        'feat': list(feat)
+                    },
+                    ignore_index=True)
+                """
         return df
 
     def predict_stats(self, x, wrt_authors=[], LOO=False):
@@ -410,7 +477,7 @@ class AuthorshipAttributionMulti(object):
     def two_author_test(self, auth1, auth2, stbl=None, within=False) :
         return self._AuthorModel[auth1]\
                   .two_table_test(self._AuthorModel[auth2],
-                   stbl = stbl,
+                   stbl=stbl,
                    within=within
                    )
         
@@ -420,13 +487,12 @@ class AuthorshipAttributionMulti(object):
             Update the model to a new set of features. 
         """
         self._vocab = new_feature_set
-        self.re_compute_author_models()
+        self.compute_author_models()
 
-    def get_discriminating_features(self, x,
-                             wrt_authors = [], stbl=None) :
+    def test_against(self, x, wrt_authors = [], stbl=None) :
         """ 
-        Find list of features discriminating text x and all
-        authors in the list.
+        two sample test of x agaist the corpora in the list 
+        wrt_authors.
         
         Args:
             x -- input text (list of strings)
@@ -435,7 +501,7 @@ class AuthorshipAttributionMulti(object):
                 If empty, evaluate with respect to all authors.
 
         Returns:
-            dictionary of scores and features 
+            data frame of counts, pvalues, and signed z scores
         """
 
         if stbl == None :
@@ -452,14 +518,9 @@ class AuthorshipAttributionMulti(object):
         for auth in tqdm(wrt_authors):
             md = self._AuthorModel[auth]
             agg_model = md.add_table(agg_model)
-            
-        HC, _, feat = agg_model.get_HC_rank_features(xdtb, stbl=stbl)
-        chisq, chisq_pval = agg_model.get_ChiSquare(xdtb)
-        cosine = agg_model.get_CosineSim(xdtb)
+            agg_model.collapse_dtm()
         
-        return {'HC': HC, 'feat': feat,
-             'chisq': chisq, 'chisq_pval' : chisq_pval,
-            'cosine': cosine}
+        return agg_model.two_table_test(xdtb, stbl=stbl)
 
     
 class AuthorshipAttributionMultiBinary(object):
@@ -490,10 +551,11 @@ class AuthorshipAttributionMultiBinary(object):
             if global_vocab == True:
                 if len(vocab) == 0:
                     #get top vocab_size terms
-                    vocab = n_most_frequent_words(list(data.text),
-                                                  n=vocab_size,
-                                                  words_to_ignore=words_to_ignore,
-                                                  ngram_range=ngram_range)
+                    vocab = n_most_frequent_words(
+                                    list(data.text),
+                                    n=vocab_size,
+                                    words_to_ignore=words_to_ignore,
+                                    ngram_range=ngram_range)
             
         lo_authors = pd.unique(data.author)  #all authors
         lo_author_pairs = [(auth1, auth2) for auth1 in lo_authors\
@@ -506,11 +568,12 @@ class AuthorshipAttributionMultiBinary(object):
 
             data_pair = data[data.author.isin(list(ap))]
             ap_model = AuthorshipAttributionMulti(
-                data_pair,
-                vocab=vocab,
-                vocab_size=vocab_size,
-                words_to_ignore=words_to_ignore,
-                stbl=stbl)
+                                    data_pair,
+                                    vocab=vocab,
+                                    vocab_size=vocab_size,
+                                    words_to_ignore=words_to_ignore,
+                                    ngram_range=ngram_range,
+                                    stbl=stbl)
             if reduce_features == True:
                 self._AuthorPairModel[ap] = ap_model
                 feat = self.reduce_features_for_author_pair(ap)

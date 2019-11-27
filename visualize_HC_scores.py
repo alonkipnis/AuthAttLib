@@ -22,7 +22,7 @@ def plot_author_pair(df, value = 'HC', wrt_authors = [],
                          columns = 'wrt_author',
                          values = [value])[value].reset_index()
 
-    lo_authors = pd.unique(df1.author)
+    lo_authors = pd.unique(df.wrt_author)
     no_authors = len(lo_authors)
     
     if no_authors < 2 :
@@ -52,7 +52,7 @@ def plot_author_pair_label(df, value = 'HC', wrt_authors = [],
                          columns = 'wrt_author',
                          values = [value])[value].reset_index()
 
-    lo_authors = pd.unique(df1.author)
+    lo_authors = pd.unique(df.wrt_author)
     no_authors = len(lo_authors)
     
     if no_authors < 2 :
@@ -200,13 +200,13 @@ def plot_col(df, value, sign, wrt_authors = []) :
     df['term'] = pd.Categorical(df['term'], categories=df['term'].values[::-1], ordered=True)
     
     if len(wrt_authors) == 0 :
-        df.loc[:,'used more by'] = True
+        df.loc[:,'used more in'] = True
         show_legend = False
     else :
-        df.loc[:,'used more by'] = df[sign].apply(lambda x : wrt_authors[0] if x>0 else wrt_authors[1])
+        df.loc[:,'used more in'] = df[sign].apply(lambda x : wrt_authors[0] if x>0 else wrt_authors[1])
         show_legend = True
 
-    p = (ggplot(aes(x='term', y=value, fill='used more by'),
+    p = (ggplot(aes(x='term', y=value, fill='used more in'),
                 data=df.dropna()) +
          geom_bar(position='dodge', stat="identity", show_legend=show_legend) +
          scale_fill_manual(values = LIST_OF_COLORS) +
@@ -218,16 +218,19 @@ def plot_col(df, value, sign, wrt_authors = []) :
         )        
     return p
 
-from plotnine import *
-def visualize_HCz(pvals) : 
+def visualize_HCz(pvals, stbl = True) : 
     from HC_aux import hc_vals_full
     
     n = len(pvals)
-    df = hc_vals_full(pvals)
+    df_pvals = hc_vals_full(pvals)
 
-    p = (ggplot(aes(x = 'u', y = 'z_stbl'), data = df) + geom_smooth(color = 'blue')
-     + geom_smooth(aes(y = 'z'), color = 'green')
-     + geom_vline(xintercept = df_pvals.u[df.z_stbl.idxmax()], color = 'blue')
-     + geom_vline(xintercept = df_pvals.u[df[df.pval > 1/n].z.idxmax()], color = 'green')
+    if stbl :
+        var = 'z_stbl'
+    else :
+        var = 'z'
+
+    p = (ggplot(aes(x = 'u', y = var), data = df_pvals) + geom_smooth(color = 'blue')
+    + geom_vline(xintercept = df_pvals.u[df_pvals[df_pvals.pval > 1/n][var].idxmax()], color = 'blue')
+     + geom_vline(xintercept = df_pvals.u[df_pvals[var].idxmax()], color = 'green', linetype = 'dashed') 
     )
     return p 

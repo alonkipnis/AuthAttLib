@@ -1,8 +1,7 @@
 import pandas as pd
 import numpy as np
 from tqdm import *
-from utils import to_docTermCounts,
-                  n_most_frequent_words
+from utils import to_docTermCounts, n_most_frequent_words
 from DocTermTable import DocTermTable
 
 class AuthorshipAttributionMulti(object):

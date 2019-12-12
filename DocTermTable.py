@@ -2,8 +2,9 @@ import numpy as np
 import scipy
 from scipy.sparse import vstack, coo_matrix
 
+import scipy
+
 from HC_aux import hc_vals, two_counts_pvals, two_sample_test
-from utils import *
 
 def change_dtm_dictionary(dtm, old_vocab, new_vocab):
     """
@@ -21,6 +22,40 @@ def change_dtm_dictionary(dtm, old_vocab, new_vocab):
         except:
             None
     return new_dtm
+
+def two_sample_chi_square(c1, c2, lambda_="pearson"):
+    """returns the Chi-Square score of the two samples c1 and c2
+     (representing counts). Null cells are ignored. 
+
+    Args: 
+     c1, c2  -- two arrays of integers of equal length
+    
+    Returns:
+        chisq -- centralized chi-square score (score - dof)
+        log of pvalue -- p-value
+    """
+    
+    if (sum(c1) == 0) or (sum(c2) == 0) :
+        return np.nan, 1
+    else :
+        obs = np.array([c1, c2])
+        chisq, pval, dof, exp = scipy.stats.chi2_contingency(
+                                        obs[:,obs.sum(0)!=0],
+                                        lambda_=lambda_
+                                                            )
+        return chisq - dof, np.log(pval)
+
+def two_sample_KS(c1, c2) :
+    """ 2-sample Kolmogorov-Smirnov test
+    """
+    return scipy.stats.ks_2samp(c1, c2)
+
+def cosine_sim(c1, c2):
+    """
+    returns the cosine similarity of the two sequences
+    (c1 and c2 are assumed to be numpy arrays of equal length)
+    """
+    return scipy.spatial.distance.cosine(c1, c2)
 
 
 class DocTermTable(object):
@@ -53,10 +88,10 @@ class DocTermTable(object):
         self._doc_names = dict([
             (s, i) for i, s, in enumerate(document_names[:dtm.shape[0]])
         ])
-        self._feature_names = feature_names  #: list of feature names (vocabulary)
+        self._feature_names = feature_names  #: feature name (list)
         self._dtm = dtm  #: doc-term-table (matrix)
-        self._stbl = stbl  #: type of HC score to use
-        self._randomized = randomized
+        self._stbl = stbl  #: type of HC score to use 
+        self._randomized = randomized #: randomized P-values or not
 
         if dtm.sum() == 0:
             raise ValueError(
@@ -345,9 +380,13 @@ class DocTermTable(object):
 
         return cosine_sim(cnt0, cnt1)
 
-    def get_HC_rank_features(self, dtbl, LOO=False,
-                            features_to_mask = [],
-                             within=False, stbl=None):
+    def get_HC_rank_features(self,
+        dtbl,                   #type: DocTermTable
+        LOO=False,             
+        features_to_mask = [],  
+        within=False,
+        stbl=None               
+                            ):
         """ returns the HC score of dtm1 wrt to doc-term table,
         as well as its rank among internal scores 
         Args:
@@ -384,8 +423,8 @@ class DocTermTable(object):
                 rank = np.nan
             if (stbl != self._stbl):
                 print("Warning: HC type stbl == {}"
-                 + " does not match internal HC type." +
-                 " Rank may be meaningless.".format(stbl)
+                     "does not match internal HC type."
+                     "Rank may be meaningless.".format(stbl)
                      )
 
         elif LOO == True :

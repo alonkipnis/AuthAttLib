@@ -10,8 +10,6 @@ from scipy.stats import chi2_contingency
 from scipy.stats import ks_2samp
 
 import re
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 def two_sample_chi_square(c1, c2, lambda_="pearson"):
     """returns the Chi-Square score of the two samples c1 and c2

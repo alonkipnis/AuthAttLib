@@ -15,7 +15,7 @@ def hc_vals(pv, alpha=0.45, stbl=True):
     [2] Donoho, D. L. and Jin, J. "Higher critcism thresholding: Optimal 
     feature selection when useful features are rare and weak", proceedings
     of the national academy of sciences, 2008.
-     )s
+     )
 
     Parameters:
         pv -- list of p-values. P-values that are np.nan are exluded.
@@ -30,8 +30,9 @@ def hc_vals(pv, alpha=0.45, stbl=True):
 
     """
     pv = np.asarray(pv)
-    pv = pv[~np.isnan(pv)]
-    n = len(pv)
+    n = len(pv)  #number of features including NA
+    pv = pv[~np.isnan(pv)]  
+    #n = len(pv)
     hc_star = np.nan
     p_star = np.nan
 
@@ -45,7 +46,7 @@ def hc_vals(pv, alpha=0.45, stbl=True):
         ps = ps[:i_lim_up]
         uu = uu[:i_lim_up]
         
-        i_lim_low = np.argmax(ps > 0.99/n)
+        i_lim_low = np.argmax(ps > 0.999/n)
 
         if stbl:
             z = (uu - ps) / np.sqrt(uu * (1 - uu)) * np.sqrt(n)
@@ -146,6 +147,16 @@ def pval_bin(n1, n2, T1, T2, min_counts=3, randomized = False):
         pval = np.nan
     return pval
 
+
+def binom_test_two_sided(x, n, p) :
+    x_low = n * p - np.abs(x-n*p)
+    x_high = n * p + np.abs(x-n*p)
+
+    prob = binom.cdf(x_low, n, p)\
+        + binom.cdf(n-x_high, n, 1-p)
+
+    return prob
+
 def binom_test_two_sided_random(x, n, p) :
     p_down = binom.cdf(n * p - np.abs(x-n*p), n, p)\
         + 1-binom.cdf(n * p + np.abs(x-n*p), n, p)
@@ -162,17 +173,7 @@ def binom_test_two_sided_random(x, n, p) :
 def z_score(n1, n2, T1, T2):
     p = (n1 + n2) / (T1 + T2)  #pooled prob of success
     se = np.sqrt(p * (1 - p) * (1. / T1 + 1. / T2))
-    if (se > 0) and (~np.isnan(se)):
-        return (n1 / T1 - n2 / T2) / se
-    else:
-        return np.nan
-
-
-def z_prop_test(n1, n2, T1, T2):
-    from scipy.stats import norm
-    z = z_score(n1, n2, T1, T2)
-    return 2 * norm.cdf(-np.abs(z))
-
+    return (n1 / T1 - n2 / T2) / se
 
 def two_sample_test(X, Y, alpha=0.45, stbl=True,
                      min_counts=3, randomized=False):
@@ -181,36 +182,63 @@ def two_sample_test(X, Y, alpha=0.45, stbl=True,
     counts = pd.DataFrame()
     counts['n1'] = X
     counts['n2'] = Y
-    counts['T1'] = counts['n1'].sum()
-    counts['T2'] = counts['n2'].sum()
+    T1 = counts['n1'].sum()
+    T2 = counts['n2'].sum()
+    counts['p'] = (T1 - counts['n1']) / (T1 + T2 - counts['n1'] - counts['n2'])
 
-    counts['pval'] = counts.apply(lambda row: pval_bin(
-        row['n1'], row['n2'], row['T1'], row['T2'],
-         min_counts=min_counts, randomized = randomized),
-                                  axis=1)
-    counts['z'] = counts.apply(
-        lambda row: z_score(row['n1'], row['n2'], row['T1'], row['T2']),
-        axis=1)
+    counts['T1'] = T1
+    counts['T2'] = T2
 
+    #counts['pval'] = #counts.apply(lambda row: pval_bin(
+        #row['n1'], row['n2'], row['T1'], row['T2'],
+        # min_counts=min_counts, randomized = randomized),
+        #                          axis=1)
+
+    if randomized :
+        counts['pval'] = binom_test_two_sided_random(counts.n1.values,
+                                          counts.n1.values + counts.n2.values,
+                                          counts['p']
+                                           )
+    else :
+        counts['pval'] = binom_test_two_sided(counts.n1.values,
+                                          counts.n1.values + counts.n2.values,
+                                          counts['p']
+                                           )
+    counts['sign'] = np.sign(counts.n1 - (counts.n1 + counts.n2) * counts.p)
     hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha, stbl=stbl)
     counts['hc'] = hc_star
-    counts.loc[counts['pval'] >= p_val_thresh, ('z')] = np.nan
-    counts.loc[np.isnan(counts['pval']), ('z')] = np.nan
+
+    counts['thresh'] = True
+    counts.loc[counts['pval'] >= p_val_thresh, ('thresh')] = False
+    counts.loc[np.isnan(counts['pval']), ('thresh')] = False
+    
     return counts
 
 
-def two_counts_pvals(c1, c2, min_counts=3, randomized=False):
+def two_counts_pvals(c1, c2, randomized=False):
     counts = pd.DataFrame()
     counts['n1'] = np.atleast_1d(c1)
     counts['n2'] = np.atleast_1d(c2)
-    counts['T1'] = counts['n1'].sum()
-    counts['T2'] = counts['n2'].sum()
+
+    T1 = counts['n1'].sum()
+    T2 = counts['n2'].sum()
+    counts['p'] = (T1 - counts['n1']) / (T1 + T2 - counts['n1'] - counts['n2'])
+
+    counts['T1'] = T1
+    counts['T2'] = T2
 
     #Joining unit1 and unit2 for the HC computation
-    counts['pval'] = counts.apply(lambda row: pval_bin(
-        row['n1'], row['n2'], row['T1'], row['T2'],
-         min_counts=min_counts, randomized=randomized),
-                                  axis=1)
+    if randomized :
+        counts['pval'] = binom_test_two_sided_random(counts.n1.values,
+                                          counts.n1.values + counts.n2.values,
+                                          counts['p']
+                                           )
+    else :
+        counts['pval'] = binom_test_two_sided(counts.n1.values,
+                                          counts.n1.values + counts.n2.values,
+                                          counts['p']
+                                           )
+
     return counts
 
 def two_list_test(term_cnt1,
@@ -239,18 +267,62 @@ def two_list_test(term_cnt1,
     counts['term'] = unit1_red.term
     counts['n1'] = unit1_red.n
     counts['n2'] = unit2_red.n
-    counts['T1'] = counts['n1'].sum()
-    counts['T2'] = counts['n2'].sum()
+    T1 = counts['n1'].sum()
+    T2 = counts['n2'].sum()
+    counts['p'] = (T1 - counts['n1']) / (T1 + T2 - counts['n1'] - counts['n2'])
 
-    counts['pval'] = counts.apply(lambda row: pval_bin(
-        row['n1'], row['n2'], row['T1'], row['T2'], min_counts=min_counts),
-                                  axis=1)
-    counts['z'] = counts.apply(
-        lambda row: z_score(row['n1'], row['n2'], row['T1'], row['T2']),
-        axis=1)
+    counts['T1'] = T1
+    counts['T2'] = T2
+    
+    counts['pval'] = binom_test_two_sided(counts.n1.values,
+                                          counts.n1.values + counts.n2.values,
+                                          counts['p']
+                                           )
 
+    counts['sign'] = np.sign(counts.n1 - (counts.n1 + counts.n2) * counts.p)
     hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha, stbl=stbl)
     counts['hc'] = hc_star
-    counts.loc[counts['pval'] > p_val_thresh, ('z')] = np.nan
-    counts.loc[np.isnan(counts['pval']), ('z')] = np.nan
+    counts['thresh'] = True
+    counts.loc[counts['pval'] >= p_val_thresh, ('thresh')] = False
+    counts.loc[np.isnan(counts['pval']), ('thresh')] = False
+
     return counts
+
+def binom_test(x,n=None,p=0.5):
+    """
+    Perform a test that the probability of success is p.
+    This is an exact, two-sided test of the null hypothesis
+    that the probability of success in a Bernoulli experiment
+    is `p`.
+    Parameters
+    ----------
+    x : integer or array_like
+        the number of successes, or if x has length 2, it is the
+        number of successes and the number of failures.
+    n : integer
+        the number of trials.  This is ignored if x gives both the
+        number of successes and failures
+    p : float, optional
+        The hypothesized probability of success.  0 <= p <= 1. The
+        default value is p = 0.5
+    Returns
+    -------
+    p-value : float
+        The p-value of the hypothesis test
+    References
+    ----------
+    .. [1] http://en.wikipedia.org/wiki/Binomial_test
+    """
+    
+    d = scipy.stats.binom.pmf(x,n,p)
+    rerr = 1+1e-7
+    if (x < p*n):
+        i = np.arange(np.ceil(p*n),n+1)
+        y = np.sum(scipy.stats.binom.pmf(i,n,p) <= d*rerr,axis=0)
+        pval = scipy.stats.binom.cdf(x,n,p) + scipy.stats.binom.sf(n-y,n,p)
+    else:
+        i = np.arange(np.floor(p*n) + 1)
+        y = np.sum(scipy.stats.binom.pmf(i,n,p) <= d*rerr,axis=0)
+        pval = scipy.stats.binom.cdf(y-1,n,p) + scipy.stats.binom.sf(x-1,n,p)
+
+    return min(1.0,pval)

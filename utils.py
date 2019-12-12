@@ -78,7 +78,43 @@ def change_vocab(dtm, old_vocab, new_vocab):
     return new_dtm
 
 
-def n_most_frequent_words(texts, n, words_to_ignore=[], ngram_range=(1, 1)):
+def n_most_frequenct_words_balanced(
+            df,
+            n, 
+            ngram_range = (1,1),
+            words_to_ignore = []
+            ) :
+    """
+        Returns n of the most frequent tokens by each author 
+        in the corpus represented by the dataframe df.
+
+        df has columns 'author', 'text', 'doc_id'
+
+    """
+
+    import random
+    df1 = pd.DataFrame(df.groupby('author').text.sum()).reset_index()
+    df1.loc[:,'len'] = df1.text.apply(lambda x : len(x.split()))
+    df1.loc[:,'min'] = df1.len.min()
+    df1.apply(lambda r : random.sample(
+        population=r['text'].split(),
+        k= r['min']),
+        axis = 1
+            )
+
+    return n_most_frequent_words(
+        df1.text,
+        n=n,
+        ngram_range=ngram_range,
+        words_to_ignore=words_to_ignore
+                    )
+
+
+def n_most_frequent_words(texts, n, 
+                words_to_ignore=[],
+                ngram_range=(1, 1),
+                balanced=False
+                         ):
     """
         Returns the 'n' most frequent tokens in the corpus represented by the 
         list of strings 'texts'
@@ -99,7 +135,12 @@ def n_most_frequent_words(texts, n, words_to_ignore=[], ngram_range=(1, 1)):
     return list(vocab_tf[:n])
 
 
-def frequent_words_tfidf(texts, no_words, words_to_ignore=[]):
+def frequent_words_tfidf(
+    texts,
+    no_words,
+    ngram_range=(1,1),
+    words_to_ignore=[]
+                        ):
     """
         Returns no_words with LOWEST tf-idf score.
         Useful in removing proper names and rare words. 
@@ -107,6 +148,7 @@ def frequent_words_tfidf(texts, no_words, words_to_ignore=[]):
 
     tfidf_vectorizer = TfidfVectorizer(analyzer='word',
                                        min_df=0,
+                                       ngram_range = ngram_range,
                                        sublinear_tf=True,
                                        stop_words=words_to_ignore)
     tfidf = tfidf_vectorizer.fit_transform(list(texts))

@@ -171,10 +171,25 @@ def plot_LDA(df, value, wrt_authors, sym = False) :
     
     df_plot = df1.melt(['t','author','doc_id'], [wrt_authors[0],wrt_authors[1]])
  
-    p = (ggplot(aes(x='t', y = 'value', color = 'author', fill = 'author', label = 'doc_id'),
-                data=df_plot) +
-         geom_rug(aes(x = 't', y = 0, color = 'author'), position = position_jitter(height = 0), size = 1) +
-         geom_bar(aes(x='t', y='value'), stat='identity', position='dodge', size = 1) +
+    p = (
+        ggplot(
+                aes(
+                x='t',
+                y='value',
+                color='author',
+                fill='author',
+                label='doc_id'
+                ),
+            data=df_plot
+            ) + geom_rug(
+            aes(x='t', y=0, color='author'),
+            position=position_jitter(height=0),
+            size=1
+            ) + geom_bar(
+                aes(x='t', y='value'),
+                stat='identity',
+                position='dodge',
+                size=1) +
          #geom_label(aes(y = 'value'), color = 'black') + 
          scale_fill_manual(LIST_OF_COLORS) + scale_color_manual(LIST_OF_COLORS)+
          stat_function(fun = scipy.stats.norm.pdf,
@@ -183,7 +198,8 @@ def plot_LDA(df, value, wrt_authors, sym = False) :
          stat_function(fun = scipy.stats.norm.pdf,
                        args = {'loc' : df_stat.loc[wrt_authors[1],'mean'],
                                'scale' : pooled_std}, color = LIST_OF_COLORS[1])
-         + ylab('prob') + xlab('projected score'))
+         + ylab('prob') + xlab('projected score')
+         )
     return p
 
 def plot_col(df, value, sign, wrt_authors = []) :

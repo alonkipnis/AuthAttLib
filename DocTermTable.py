@@ -1,6 +1,6 @@
 import numpy as np
 import scipy
-from scipy.sparse import vstack
+from scipy.sparse import vstack, coo_matrix
 
 from HC_aux import hc_vals, two_counts_pvals, two_sample_test
 from utils import *
@@ -28,19 +28,18 @@ class DocTermTable(object):
     similarity computations with with respect to a document-term matrix.
  
     Args: 
-            dtm -- (sparse) doc-term matrix.
-            feature_names -- list of names for each column of dtm.
-            document_names -- list of names for each row of dtm.
-            stbl -- type of HC statistic to use 
+            dtm  (sparse scipy matrix)-- doc-term matrix.
+            feature_names (list) -- list of names for each column of dtm.
+            document_names (list) -- list of names for each row of dtm.
+            stbl (boolean) -- type of HC statistic to use 
+            randomized (boolean) -- randomized P-values 
 
     To Do:
-        - DONE: implement a method to collapse the table to a single row
-          in order to save memory and computing time
         - rank of ChiSquare in LOO
-        - log(pval) in ChiSquare test 
 
     """
-    def __init__(self, dtm, feature_names=[], document_names=[], stbl=True):
+    def __init__(self, dtm, feature_names=[],
+             document_names=[], stbl=True, randomized=False):
         """ 
         Args: 
             dtm -- (sparse) doc-term matrix.
@@ -57,6 +56,7 @@ class DocTermTable(object):
         self._feature_names = feature_names  #: list of feature names (vocabulary)
         self._dtm = dtm  #: doc-term-table (matrix)
         self._stbl = stbl  #: type of HC score to use
+        self._randomized = randomized
 
         if dtm.sum() == 0:
             raise ValueError(
@@ -93,7 +93,8 @@ class DocTermTable(object):
             return []
         for r in self._dtm:
             c = np.squeeze(np.array(r.todense()))
-            pv = two_counts_pvals(c, counts - c).pval
+            pv = two_counts_pvals(c, counts - c,
+             randomized=self._randomized).pval
             pv_list += [pv.values]
 
         return pv_list
@@ -128,9 +129,11 @@ class DocTermTable(object):
             cnt2 = cnt0 - cnt1
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
-            pv = two_counts_pvals(cnt1, cnt2).pval
+            pv = two_counts_pvals(cnt1, cnt2,
+                     randomized=self._randomized).pval
         else:
-            pv = two_counts_pvals(cnt1, cnt0).pval
+            pv = two_counts_pvals(cnt1, cnt0,
+                     randomized=self._randomized).pval
         return pv.values 
 
     def _get_counts(self, dtbl, within=False) :
@@ -186,7 +189,9 @@ class DocTermTable(object):
 
         return self._get_Pvals(dtbl.get_counts())
 
-    def two_table_test(self, dtbl, within=False, stbl=None) :
+    def two_table_test(self, dtbl,
+                 within=False, stbl=None,
+                 randomized=False) :
         """counts, p-values, and HC with 
         respect to another DocTermTable
         """
@@ -194,7 +199,7 @@ class DocTermTable(object):
             stbl = self._stbl
 
         cnt0, cnt1 = self._get_counts(dtbl, within=within)
-        df = two_sample_test(cnt0, cnt1, stbl=stbl)
+        df = two_sample_test(cnt0, cnt1, stbl=stbl, randomized=randomized)
         df.loc[:,'feat'] = self._feature_names
         return df
 
@@ -303,8 +308,10 @@ class DocTermTable(object):
 
             if feat != feat1 :
                 dtbl = dtbl.change_vocabulary(feat)
-
-            dtm_tall = vstack([self._dtm, dtbl._dtm]).tolil()        
+            try :
+                dtm_tall = vstack([self._dtm, dtbl._dtm]).tolil()
+            except :
+                dtm_tall = vstack([self._dtm, coo_matrix(dtbl._dtm)]).tolil()        
             new_table = DocTermTable(dtm_tall,
                              feature_names=feat,
         document_names= list(self._doc_names.keys()) \
@@ -352,11 +359,8 @@ class DocTermTable(object):
 
         if stbl == None:
             stbl = self._stbl
-
-        if within == True:
-            pvals = self._get_Pvals(dtbl.get_counts(), within == True)
-        else:
-            pvals = self.get_Pvals(dtbl)
+        
+        pvals = self._get_Pvals(dtbl.get_counts(), within=within)
 
         # ignore features within 'features_to_mask':
         for f in features_to_mask :

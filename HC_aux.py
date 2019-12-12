@@ -1,8 +1,9 @@
+#TODO: vectorized pval_bin (use vectorzided binom.pdf and binom.cdf)
+
 import pandas as pd
 import numpy as np
-from sklearn.feature_extraction.text import CountVectorizer
-
-import re
+from scipy.stats import binom
+from scipy.stats import binom_test
 
 
 def hc_vals(pv, alpha=0.45, stbl=True):
@@ -38,7 +39,7 @@ def hc_vals(pv, alpha=0.45, stbl=True):
         ps_idx = np.argsort(pv)
         ps = pv[ps_idx]  #sorted pvals
 
-        uu = np.linspace(1 / n, 1, n)  #approximate expectation of p-values
+        uu = np.linspace(1 / n, 0.999, n)  #approximate expectation of p-values
         i_lim_up = np.maximum(int(np.floor(alpha * n + 0.5)), 1)
 
         ps = ps[:i_lim_up]
@@ -131,16 +132,32 @@ def hc_vals_full(pv, alpha=0.45):
     return df
 
 
-def pval_bin(n1, n2, T1, T2, min_counts=3):
-    from scipy.stats import binom_test
+def pval_bin(n1, n2, T1, T2, min_counts=3, randomized = False):
     if ((n1 + n2 >= min_counts) and (T1 > n1)):
-        pval = binom_test(x=n1,
+        if randomized :
+            pval = binom_test_two_sided_random(x=np.array([n1]),
                           n=n1 + n2,
-                          p=(T1 - n1) / np.float((T1 + T2 - n1 - n2)))
+                          p=(T1 - n1) / np.float((T1 + T2 - n1 - n2)))[0]
+        else :
+            pval = binom_test(x=n1,
+                              n=n1 + n2,
+                              p=(T1 - n1) / np.float((T1 + T2 - n1 - n2)))
     else:
         pval = np.nan
     return pval
 
+def binom_test_two_sided_random(x, n, p) :
+    p_down = binom.cdf(n * p - np.abs(x-n*p), n, p)\
+        + 1-binom.cdf(n * p + np.abs(x-n*p), n, p)
+
+    p_center = p_down + binom.pmf(n * p + np.abs(x-n*p), n, p)
+
+    p_up = p_center + binom.pmf(n * p - np.abs(x-n*p), n, p)
+    
+    #p_down = p_up = p_center
+
+    return np.minimum(p_down + (p_up-p_down)*np.random.rand(x.shape[0]), 1)
+    
 
 def z_score(n1, n2, T1, T2):
     p = (n1 + n2) / (T1 + T2)  #pooled prob of success
@@ -157,7 +174,8 @@ def z_prop_test(n1, n2, T1, T2):
     return 2 * norm.cdf(-np.abs(z))
 
 
-def two_sample_test(X, Y, alpha=0.45, stbl=True, min_counts=3):
+def two_sample_test(X, Y, alpha=0.45, stbl=True,
+                     min_counts=3, randomized=False):
     # Input: X, Y, are two lists of integers of equal length :
     # Output: data frame: "X, Y, T1, n2, T2, pval, pval_z, hc"
     counts = pd.DataFrame()
@@ -167,7 +185,8 @@ def two_sample_test(X, Y, alpha=0.45, stbl=True, min_counts=3):
     counts['T2'] = counts['n2'].sum()
 
     counts['pval'] = counts.apply(lambda row: pval_bin(
-        row['n1'], row['n2'], row['T1'], row['T2'], min_counts=min_counts),
+        row['n1'], row['n2'], row['T1'], row['T2'],
+         min_counts=min_counts, randomized = randomized),
                                   axis=1)
     counts['z'] = counts.apply(
         lambda row: z_score(row['n1'], row['n2'], row['T1'], row['T2']),
@@ -180,7 +199,7 @@ def two_sample_test(X, Y, alpha=0.45, stbl=True, min_counts=3):
     return counts
 
 
-def two_counts_pvals(c1, c2, min_counts=3):
+def two_counts_pvals(c1, c2, min_counts=3, randomized=False):
     counts = pd.DataFrame()
     counts['n1'] = np.atleast_1d(c1)
     counts['n2'] = np.atleast_1d(c2)
@@ -189,7 +208,8 @@ def two_counts_pvals(c1, c2, min_counts=3):
 
     #Joining unit1 and unit2 for the HC computation
     counts['pval'] = counts.apply(lambda row: pval_bin(
-        row['n1'], row['n2'], row['T1'], row['T2'], min_counts=min_counts),
+        row['n1'], row['n2'], row['T1'], row['T2'],
+         min_counts=min_counts, randomized=randomized),
                                   axis=1)
     return counts
 

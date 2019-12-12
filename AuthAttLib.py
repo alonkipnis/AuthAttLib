@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 from tqdm import *
-from utils import to_docTermCounts, n_most_frequent_words
+from utils import to_docTermCounts,
+                  n_most_frequent_words
 from DocTermTable import DocTermTable
 
 class AuthorshipAttributionMulti(object):
@@ -28,7 +29,8 @@ class AuthorshipAttributionMulti(object):
                  words_to_ignore=[],
                  ngram_range=(1, 1),
                  stbl=True,
-                 flat=False
+                 flat=False,
+                 randomized=False,
                  ):
         """
         Args:
@@ -51,6 +53,7 @@ class AuthorshipAttributionMulti(object):
         #: in the model.
         self._stbl = stbl  #:  type of HC statistic to use.
         self._flat = flat
+        self._randomized = randomized #: randomize pvalue or not
 
         if len(self._vocab) == 0:  #common vocabulary
             vocab = n_most_frequent_words(list(data.text),
@@ -101,7 +104,9 @@ class AuthorshipAttributionMulti(object):
         return DocTermTable(dtm,
                     feature_names=self._vocab,
                     document_names=document_names,
-                    stbl=self._stbl)
+                    stbl=self._stbl,
+                    randomized=self._randomized
+                    )
 
     def compute_author_models(self):
         """ compute author models after a change in vocab """
@@ -285,13 +290,16 @@ class AuthorshipAttributionMulti(object):
         return df
 
 
-    def internal_stats(self, wrt_authors=[], LOO=False):
+    def internal_stats(self, authors = [], 
+            wrt_authors=[], LOO=False, verbatim=False):
         """
         Compute scores of each document with respect to the corpus of
         each author. When tested against its own corpus, the document
         is removed from that corpus. 
         
         Args:
+        authors -- subset of the authors in the model. Test only documents
+                belonging to these authors
         wrt_authors -- subset of the authors in the model with respect
                 to which the scores of each document are evaluated.
                 If empty, evaluate with respect to all authors.
@@ -315,17 +323,19 @@ class AuthorshipAttributionMulti(object):
 
         df = pd.DataFrame()
 
-        #if len(wrt_authors) == 0:
+        if len(authors) == 0:
             # evaluate with resepct to all authors in the model
-         #   wrt_authors = self._AuthorModel
+            authors = self._AuthorModel
 
-        for auth0 in self._AuthorModel :
+        for auth0 in authors :
             #tqdm(wrt_authors):
             md0 = self._AuthorModel[auth0]
             #for auth1 in self._AuthorModel:
             #    md1 = self._AuthorModel[auth1]
             lo_docs = md0.get_document_names()
             for dn in lo_docs:
+                if verbatim :
+                    print("testing {} by {}".format(dn,auth0))
                 df = df.append(self.get_doc_stats(dn, auth0,
                  wrt_authors = wrt_authors,
                   LOO = LOO), ignore_index=True)
@@ -474,11 +484,13 @@ class AuthorshipAttributionMulti(object):
                     ignore_index=True)
         return df
 
-    def two_author_test(self, auth1, auth2, stbl=None, within=False) :
+    def two_author_test(self, auth1, auth2, stbl=None,
+                within=False, randomized=False) :
         return self._AuthorModel[auth1]\
                   .two_table_test(self._AuthorModel[auth2],
                    stbl=stbl,
-                   within=within
+                   within=within,
+                   randomized=randomized
                    )
         
 
@@ -540,12 +552,14 @@ class AuthorshipAttributionMultiBinary(object):
             ngram_range=(1, 1),
             stbl=True,
             reduce_features=False,
+            randomized=False,
     ):
         # train_data is a dataframe with at least fields: author|doc_id|text
         # vocab_size is an integer controlling the size of vocabulary
 
         self._AuthorPairModel = {}
         self._stbl = stbl
+        self._randomized = randomized
 
         if len(vocab) == 0 :
             if global_vocab == True:

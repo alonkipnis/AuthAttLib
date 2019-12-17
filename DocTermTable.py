@@ -101,6 +101,8 @@ class DocTermTable(object):
 
         self.__compute_internal_stat()
 
+
+
     def __compute_internal_stat(self):
         """summarize internal doc-term-table"""
 
@@ -129,8 +131,8 @@ class DocTermTable(object):
         for r in self._dtm:
             c = np.squeeze(np.array(r.todense()))
             pv = two_counts_pvals(c, counts - c,
-             randomized=self._randomized).pval
-            pv_list += [pv.values]
+             randomized=self._randomized)
+            pv_list += [pv]
 
         return pv_list
 
@@ -165,11 +167,11 @@ class DocTermTable(object):
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
             pv = two_counts_pvals(cnt1, cnt2,
-                     randomized=self._randomized).pval
+                     randomized=self._randomized)
         else:
             pv = two_counts_pvals(cnt1, cnt0,
-                     randomized=self._randomized).pval
-        return pv.values 
+                     randomized=self._randomized)
+        return pv 
 
     def _get_counts(self, dtbl, within=False) :
         """ Returns two list of counts, one from an 
@@ -290,8 +292,8 @@ class DocTermTable(object):
         s = self._counts + s1
         for r in dtm_all:
             c = np.squeeze(np.array(r.todense()))  #no dense
-            pv = two_counts_pvals(c, s - c).pval
-            pv_list += [pv.values]
+            pv = two_counts_pvals(c, s - c)
+            pv_list += [pv]
 
         return pv_list
 

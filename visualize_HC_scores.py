@@ -5,10 +5,9 @@ import warnings
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import scipy
 
-LIST_OF_COLORS = [
-    "#F8766D", "#619CFF", 'tab:gray', "#00BA38", 'tab:red',
-    'tab:olive', 'tab:blue',
-    'tab:orange', 'tab:purple', 'tab:brown', 'tab:pink',
+LIST_OF_COLORS = ['tab:red', 'tab:blue','tab:gray', "#00BA38", 
+    'tab:olive', "#619CFF", 'tab:orange', "#F8766D",
+    'tab:purple', 'tab:brown', 'tab:pink',
     'tab:green', 'tab:cyan', 'royalblue', 'darksaltgray', 'forestgreen',
     'cyan', 'navy'
     'magenta', '#595959', 'lightseagreen', 'orangered', 'crimson'
@@ -245,8 +244,18 @@ def visualize_HCz(pvals, stbl = True) :
     else :
         var = 'z'
 
-    p = (ggplot(aes(x = 'u', y = var), data = df_pvals) + geom_smooth(color = 'blue')
-    + geom_vline(xintercept = df_pvals.u[df_pvals[df_pvals.pval > 1/n][var].idxmax()], color = 'blue')
-     + geom_vline(xintercept = df_pvals.u[df_pvals[var].idxmax()], color = 'green', linetype = 'dashed') 
+    p = (
+    ggplot(aes(x = 'u', y = var),
+           data = df_pvals) + geom_smooth(color = 'blue'
+           )
+    + geom_vline(
+    xintercept = df_pvals.u[df_pvals[df_pvals.pval > 1/n][var].idxmax()],
+    color = 'blue'
+                )
+     + geom_vline(
+    xintercept = df_pvals.u[df_pvals[var].idxmax()],
+    color = 'green',
+    linetype = 'dashed'
+                ) 
     )
     return p 

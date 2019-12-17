@@ -1,10 +1,6 @@
-#TODO: vectorized pval_bin (use vectorzided binom.pdf and binom.cdf)
-
 import pandas as pd
 import numpy as np
 from scipy.stats import binom
-from scipy.stats import binom_test
-
 
 def hc_vals(pv, alpha=0.45, stbl=True):
     """
@@ -68,8 +64,8 @@ def hc_vals(pv, alpha=0.45, stbl=True):
 
 def hc_vals_full(pv, alpha=0.45):
     pv = np.asarray(pv)
-    pv = pv[~np.isnan(pv)]
     n = len(pv)
+    pv = pv[~np.isnan(pv)]
     hc_star = np.nan
     p_star = np.nan
 
@@ -148,6 +144,21 @@ def pval_bin(n1, n2, T1, T2, min_counts=3, randomized = False):
     return pval
 
 
+def binom_test_two_sided2(x, n, p) :
+    #slower
+    def my_func(r) :
+        from scipy.stats import binom_test
+        return binom_test(r[0],r[1],r[2])
+
+    a = np.concatenate([np.expand_dims(x,1),
+                    np.expand_dims(n,1),
+                    np.expand_dims(p,1)],
+                    axis = 1)
+
+    pv = np.apply_along_axis(my_func,1,a)
+
+    return pv
+
 def binom_test_two_sided(x, n, p) :
     x_low = n * p - np.abs(x-n*p)
     x_high = n * p + np.abs(x-n*p)
@@ -158,16 +169,18 @@ def binom_test_two_sided(x, n, p) :
     return prob
 
 def binom_test_two_sided_random(x, n, p) :
-    p_down = binom.cdf(n * p - np.abs(x-n*p), n, p)\
-        + 1-binom.cdf(n * p + np.abs(x-n*p), n, p)
+    x_low = n * p - np.abs(x-n*p)
+    x_high = n * p + np.abs(x-n*p)
 
-    p_center = p_down + binom.pmf(n * p + np.abs(x-n*p), n, p)
-
-    p_up = p_center + binom.pmf(n * p - np.abs(x-n*p), n, p)
+    p_up = binom.cdf(x_low, n, p)\
+        + binom.cdf(n-x_high, n, 1-p)
     
+    p_down = binom.cdf(x_low-0.5, n, p)\
+        + binom.cdf(n-x_high-0.5, n, 1-p)
+        
     #p_down = p_up = p_center
-
     return np.minimum(p_down + (p_up-p_down)*np.random.rand(x.shape[0]), 1)
+
     
 
 def z_score(n1, n2, T1, T2):
@@ -175,8 +188,13 @@ def z_score(n1, n2, T1, T2):
     se = np.sqrt(p * (1 - p) * (1. / T1 + 1. / T2))
     return (n1 / T1 - n2 / T2) / se
 
-def two_sample_test(X, Y, alpha=0.45, stbl=True,
-                     min_counts=3, randomized=False):
+def two_sample_test(
+    X,
+    Y,
+    alpha=0.45,
+    stbl=True,
+    randomized=False
+    ):
     # Input: X, Y, are two lists of integers of equal length :
     # Output: data frame: "X, Y, T1, n2, T2, pval, pval_z, hc"
     counts = pd.DataFrame()
@@ -200,13 +218,13 @@ def two_sample_test(X, Y, alpha=0.45, stbl=True,
                                           counts['p']
                                            )
     else :
-        counts['pval'] = binom_test_two_sided(counts.n1.values,
+        counts['pval'] = binom_test_two_sided2(counts.n1.values,
                                           counts.n1.values + counts.n2.values,
                                           counts['p']
                                            )
     counts['sign'] = np.sign(counts.n1 - (counts.n1 + counts.n2) * counts.p)
     hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha, stbl=stbl)
-    counts['hc'] = hc_star
+    counts['HC'] = hc_star
 
     counts['thresh'] = True
     counts.loc[counts['pval'] >= p_val_thresh, ('thresh')] = False
@@ -216,30 +234,18 @@ def two_sample_test(X, Y, alpha=0.45, stbl=True,
 
 
 def two_counts_pvals(c1, c2, randomized=False):
-    counts = pd.DataFrame()
-    counts['n1'] = np.atleast_1d(c1)
-    counts['n2'] = np.atleast_1d(c2)
 
-    T1 = counts['n1'].sum()
-    T2 = counts['n2'].sum()
-    counts['p'] = (T1 - counts['n1']) / (T1 + T2 - counts['n1'] - counts['n2'])
-
-    counts['T1'] = T1
-    counts['T2'] = T2
+    T1 = c1.sum()
+    T2 = c2.sum()
+    p = (T1 - c1) / (T1 + T2 - c1 - c2)
 
     #Joining unit1 and unit2 for the HC computation
     if randomized :
-        counts['pval'] = binom_test_two_sided_random(counts.n1.values,
-                                          counts.n1.values + counts.n2.values,
-                                          counts['p']
-                                           )
+        pvals = binom_test_two_sided_random(c1, c1 + c2, p)
     else :
-        counts['pval'] = binom_test_two_sided(counts.n1.values,
-                                          counts.n1.values + counts.n2.values,
-                                          counts['p']
-                                           )
+        pvals = binom_test_two_sided(c1, c1 + c2, p)
 
-    return counts
+    return pvals
 
 def two_list_test(term_cnt1,
                   term_cnt2,
@@ -281,7 +287,7 @@ def two_list_test(term_cnt1,
 
     counts['sign'] = np.sign(counts.n1 - (counts.n1 + counts.n2) * counts.p)
     hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha, stbl=stbl)
-    counts['hc'] = hc_star
+    counts['HC'] = hc_star
     counts['thresh'] = True
     counts.loc[counts['pval'] >= p_val_thresh, ('thresh')] = False
     counts.loc[np.isnan(counts['pval']), ('thresh')] = False

@@ -36,7 +36,7 @@ def plot_author_pair(df, value = 'HC', wrt_authors = [],
     df1.loc[:, 'y'] = df1.loc[:, wrt_authors[1]].astype('float')
     p = (
         ggplot(aes(x='x', y='y', color='author', shape = 'author'), data=df1) +
-        geom_point(show_legend=show_legend) + geom_abline(alpha=0.5) +
+        geom_point(show_legend=show_legend, size = 3) + geom_abline(alpha=0.5) +
         # geom_text(aes(label = 'doc_id', check_overlap = True)) +
         xlab(wrt_authors[0]) + ylab(wrt_authors[1]) +
         scale_color_manual(values=color_map) +  #+ xlim(0,35) + ylim(0,35)

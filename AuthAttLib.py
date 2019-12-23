@@ -29,7 +29,7 @@ class AuthorshipAttributionMulti(object):
                  ngram_range=(1, 1),
                  stbl=True,
                  flat=False,
-                 randomized=False,
+                 randomize=False,
                  ):
         """
         Args:
@@ -52,7 +52,7 @@ class AuthorshipAttributionMulti(object):
         #: in the model.
         self._stbl = stbl  #:  type of HC statistic to use.
         self._flat = flat
-        self._randomized = randomized #: randomize pvalue or not
+        self._randomize = randomize #: randomize pvalue or not
 
         if len(self._vocab) == 0:  #common vocabulary
             vocab = n_most_frequent_words(list(data.text),
@@ -104,7 +104,7 @@ class AuthorshipAttributionMulti(object):
                     feature_names=self._vocab,
                     document_names=document_names,
                     stbl=self._stbl,
-                    randomized=self._randomized
+                    randomize=self._randomize
                     )
 
     def compute_author_models(self):
@@ -116,8 +116,12 @@ class AuthorshipAttributionMulti(object):
             print("Changing vocabulary for {}. Found {} relevant tokens."\
                 .format(auth, am._counts.sum()))
 
-    def predict(self, x, method='HC', features_to_mask = [],
-                 unk_thresh=1e6, LOO=False):
+    def predict(self,
+            x,
+            method='HC',
+            unk_thresh=1e6,
+            LOO=False
+            ):
         """
         Attribute text x with one of the authors or '<UNK>'. 
 
@@ -131,7 +135,6 @@ class AuthorshipAttributionMulti(object):
             LOO -- indicates whether to compute rank in a leave-of-out mode
             It leads to more accurate rank-based testing but require more 
             computations. 
-            features_to_mask -- mask these features from HC test. 
 
         Returns:
             pred -- one of the keys in self._AuthorModel or '<UNK>'
@@ -156,9 +159,7 @@ class AuthorshipAttributionMulti(object):
             am = self._AuthorModel[auth]
             
             if method == 'HC' or method == 'HC_rank':
-                HC, rank, feat = am.get_HC_rank_features(Xdtb, 
-                        features_to_mask = features_to_mask,
-                                LOO=LOO)
+                HC, rank, feat = am.get_HC_rank_features(Xdtb, LOO=LOO)
                 score = HC
                 if method == 'HC' :
                     score = HC
@@ -290,7 +291,7 @@ class AuthorshipAttributionMulti(object):
 
 
     def internal_stats(self, authors = [], 
-            wrt_authors=[], LOO=False, verbatim=False):
+            wrt_authors=[], LOO=False, verbose=False):
         """
         Compute scores of each document with respect to the corpus of
         each author. When tested against its own corpus, the document
@@ -333,7 +334,7 @@ class AuthorshipAttributionMulti(object):
             #    md1 = self._AuthorModel[auth1]
             lo_docs = md0.get_document_names()
             for dn in lo_docs:
-                if verbatim :
+                if verbose :
                     print("testing {} by {}".format(dn,auth0))
                 df = df.append(self.get_doc_stats(dn, auth0,
                  wrt_authors = wrt_authors,
@@ -484,12 +485,12 @@ class AuthorshipAttributionMulti(object):
         return df
 
     def two_author_test(self, auth1, auth2, stbl=None,
-                within=False, randomized=False) :
+                within=False, randomize=False) :
         return self._AuthorModel[auth1]\
                   .two_table_test(self._AuthorModel[auth2],
                    stbl=stbl,
                    within=within,
-                   randomized=randomized
+                   randomize=randomize
                    )
         
 
@@ -551,14 +552,14 @@ class AuthorshipAttributionMultiBinary(object):
             ngram_range=(1, 1),
             stbl=True,
             reduce_features=False,
-            randomized=False,
+            randomize=False,
     ):
         # train_data is a dataframe with at least fields: author|doc_id|text
         # vocab_size is an integer controlling the size of vocabulary
 
         self._AuthorPairModel = {}
         self._stbl = stbl
-        self._randomized = randomized
+        self._randomize = randomize
 
         if len(vocab) == 0 :
             if global_vocab == True:
@@ -586,9 +587,12 @@ class AuthorshipAttributionMultiBinary(object):
                                     vocab_size=vocab_size,
                                     words_to_ignore=words_to_ignore,
                                     ngram_range=ngram_range,
-                                    stbl=stbl)
+                                    stbl=stbl,
+                                    randomize=self._randomize
+                                    )
+
+            self._AuthorPairModel[ap] = ap_model
             if reduce_features == True:
-                self._AuthorPairModel[ap] = ap_model
                 feat = self.reduce_features_for_author_pair(ap)
                 print("Reduced to {} features...".format(len(feat)))
                 

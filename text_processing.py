@@ -1,11 +1,13 @@
-""" Various simple functions for parsing, processing, and cleaning text. 
+""" Functions for parsing, processing, and cleaning text. 
 """
-
 import re
 import bs4 
 import nltk
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer 
+
+
+
 
 def remove_parts_of_speach(text, 
                         to_remove = ('NNP', 'NNPS', 'CD'),
@@ -56,10 +58,6 @@ def remove_digits(text) :
 def remove_hexa_symbols(text) :
     #replace with a space
     return re.sub("\\\\x[0-9a-f]+"," ",text)
-
-def remove_CR_LF(text) :
-    #replace with a space
-    return re.sub("\\\\(n|r)"," ",text)
 
 def preprocess_text(text, stem = True, clean_names = True,
                clean_html_tags = True, clean_digits = True

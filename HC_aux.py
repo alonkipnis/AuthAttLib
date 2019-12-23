@@ -73,7 +73,7 @@ def hc_vals_full(pv, alpha=0.45):
         ps_idx = np.argsort(pv)
         ps = pv[ps_idx]  #sorted pvals
 
-        uu = np.linspace(1 / n, 1, n)  #expectation of p-values
+        uu = np.linspace(1 / n, 0.999, n)  #expectation of p-values
         i_lim_up = np.maximum(int(np.floor(alpha * n + 0.5)), 1)
 
         uu = uu[:i_lim_up]
@@ -129,9 +129,9 @@ def hc_vals_full(pv, alpha=0.45):
     return df
 
 
-def pval_bin(n1, n2, T1, T2, min_counts=3, randomized = False):
+def pval_bin(n1, n2, T1, T2, min_counts=3, randomize = False):
     if ((n1 + n2 >= min_counts) and (T1 > n1)):
-        if randomized :
+        if randomize :
             pval = binom_test_two_sided_random(x=np.array([n1]),
                           n=n1 + n2,
                           p=(T1 - n1) / np.float((T1 + T2 - n1 - n2)))[0]
@@ -166,7 +166,7 @@ def binom_test_two_sided(x, n, p) :
     prob = binom.cdf(x_low, n, p)\
         + binom.cdf(n-x_high, n, 1-p)
 
-    return prob
+    return prob * (n!=0) + 1.* (n==0)
 
 def binom_test_two_sided_random(x, n, p) :
     x_low = n * p - np.abs(x-n*p)
@@ -178,8 +178,8 @@ def binom_test_two_sided_random(x, n, p) :
     p_down = binom.cdf(x_low-0.5, n, p)\
         + binom.cdf(n-x_high-0.5, n, 1-p)
         
-    #p_down = p_up = p_center
-    return np.minimum(p_down + (p_up-p_down)*np.random.rand(x.shape[0]), 1)
+    p = np.minimum(p_down + (p_up-p_down)*np.random.rand(x.shape[0]), 1)
+    return p * (n != 0) + 1. * (n == 0)
 
     
 
@@ -193,7 +193,7 @@ def two_sample_test(
     Y,
     alpha=0.45,
     stbl=True,
-    randomized=False
+    randomize=False
     ):
     # Input: X, Y, are two lists of integers of equal length :
     # Output: data frame: "X, Y, T1, n2, T2, pval, pval_z, hc"
@@ -209,16 +209,16 @@ def two_sample_test(
 
     #counts['pval'] = #counts.apply(lambda row: pval_bin(
         #row['n1'], row['n2'], row['T1'], row['T2'],
-        # min_counts=min_counts, randomized = randomized),
+        # min_counts=min_counts, randomize = randomize),
         #                          axis=1)
 
-    if randomized :
+    if randomize :
         counts['pval'] = binom_test_two_sided_random(counts.n1.values,
                                           counts.n1.values + counts.n2.values,
                                           counts['p']
                                            )
     else :
-        counts['pval'] = binom_test_two_sided2(counts.n1.values,
+        counts['pval'] = binom_test_two_sided(counts.n1.values,
                                           counts.n1.values + counts.n2.values,
                                           counts['p']
                                            )
@@ -233,14 +233,14 @@ def two_sample_test(
     return counts
 
 
-def two_counts_pvals(c1, c2, randomized=False):
+def two_counts_pvals(c1, c2, randomize=False):
 
     T1 = c1.sum()
     T2 = c2.sum()
     p = (T1 - c1) / (T1 + T2 - c1 - c2)
 
     #Joining unit1 and unit2 for the HC computation
-    if randomized :
+    if randomize :
         pvals = binom_test_two_sided_random(c1, c1 + c2, p)
     else :
         pvals = binom_test_two_sided(c1, c1 + c2, p)

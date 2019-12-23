@@ -1,62 +1,9 @@
 import numpy as np
 import scipy
 from scipy.sparse import vstack, coo_matrix
-
-import scipy
+from goodness_of_fit_tests import *
 
 from HC_aux import hc_vals, two_counts_pvals, two_sample_test
-
-def change_dtm_dictionary(dtm, old_vocab, new_vocab):
-    """
-       Switch columns in doc-term matrix according to new_vocab 
-       Words not in new_vocab are ignored
-       dtm is a document-term matrix (sparse format)
-       old_vocab and new_vocab are lists of words (without duplicaties)
-    """
-
-    new_dtm = scipy.sparse.lil_matrix(np.zeros((dtm.shape[0],
-                                             len(new_vocab))))
-    for i, w in enumerate(new_vocab):
-        try:
-            new_dtm[:, i] = dtm[:, old_vocab.index(w)]
-        except:
-            None
-    return new_dtm
-
-def two_sample_chi_square(c1, c2, lambda_="pearson"):
-    """returns the Chi-Square score of the two samples c1 and c2
-     (representing counts). Null cells are ignored. 
-
-    Args: 
-     c1, c2  -- two arrays of integers of equal length
-    
-    Returns:
-        chisq -- centralized chi-square score (score - dof)
-        log of pvalue -- p-value
-    """
-    
-    if (sum(c1) == 0) or (sum(c2) == 0) :
-        return np.nan, 1
-    else :
-        obs = np.array([c1, c2])
-        chisq, pval, dof, exp = scipy.stats.chi2_contingency(
-                                        obs[:,obs.sum(0)!=0],
-                                        lambda_=lambda_
-                                                            )
-        return chisq - dof, np.log(pval)
-
-def two_sample_KS(c1, c2) :
-    """ 2-sample Kolmogorov-Smirnov test
-    """
-    return scipy.stats.ks_2samp(c1, c2)
-
-def cosine_sim(c1, c2):
-    """
-    returns the cosine similarity of the two sequences
-    (c1 and c2 are assumed to be numpy arrays of equal length)
-    """
-    return scipy.spatial.distance.cosine(c1, c2)
-
 
 class DocTermTable(object):
     """ Interface for p-value, Higher Criticism (HC), and cosine
@@ -67,14 +14,14 @@ class DocTermTable(object):
             feature_names (list) -- list of names for each column of dtm.
             document_names (list) -- list of names for each row of dtm.
             stbl (boolean) -- type of HC statistic to use 
-            randomized (boolean) -- randomized P-values 
+            randomize (boolean) -- randomized P-values 
 
     To Do:
         - rank of ChiSquare in LOO
 
     """
     def __init__(self, dtm, feature_names=[],
-             document_names=[], stbl=True, randomized=False):
+             document_names=[], stbl=True, randomize=False):
         """ 
         Args: 
             dtm -- (sparse) doc-term matrix.
@@ -91,7 +38,7 @@ class DocTermTable(object):
         self._feature_names = feature_names  #: feature name (list)
         self._dtm = dtm  #: doc-term-table (matrix)
         self._stbl = stbl  #: type of HC score to use 
-        self._randomized = randomized #: randomized P-values or not
+        self._randomize = randomize #: randomize P-values or not
 
         if dtm.sum() == 0:
             raise ValueError(
@@ -100,7 +47,6 @@ class DocTermTable(object):
             )
 
         self.__compute_internal_stat()
-
 
 
     def __compute_internal_stat(self):
@@ -130,8 +76,7 @@ class DocTermTable(object):
             return []
         for r in self._dtm:
             c = np.squeeze(np.array(r.todense()))
-            pv = two_counts_pvals(c, counts - c,
-             randomized=self._randomized)
+            pv = two_counts_pvals(c, counts - c, randomize=self._randomize)
             pv_list += [pv]
 
         return pv_list
@@ -166,11 +111,9 @@ class DocTermTable(object):
             cnt2 = cnt0 - cnt1
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
-            pv = two_counts_pvals(cnt1, cnt2,
-                     randomized=self._randomized)
+            pv = two_counts_pvals(cnt1, cnt2, randomize=self._randomize)
         else:
-            pv = two_counts_pvals(cnt1, cnt0,
-                     randomized=self._randomized)
+            pv = two_counts_pvals(cnt1, cnt0, randomize=self._randomize)
         return pv 
 
     def _get_counts(self, dtbl, within=False) :
@@ -228,7 +171,7 @@ class DocTermTable(object):
 
     def two_table_test(self, dtbl,
                  within=False, stbl=None,
-                 randomized=False) :
+                 randomize=False) :
         """counts, p-values, and HC with 
         respect to another DocTermTable
         """
@@ -236,29 +179,11 @@ class DocTermTable(object):
             stbl = self._stbl
 
         cnt0, cnt1 = self._get_counts(dtbl, within=within)
-        df = two_sample_test(cnt0, cnt1, stbl=stbl, randomized=randomized)
+        df = two_sample_test(cnt0, cnt1, stbl=stbl, randomize=randomize)
         df.loc[:,'feat'] = self._feature_names
         return df
 
 
-    def per_doc_Pvals_LOO(self, dtbl):
-        """ return a list of internal pvals after adding another 
-        table to the current one.
-
-        Args:
-            dtbl -- DocTermTable to add and to compute score with
-                    respect to it
-        """
-
-        if dtbl._feature_names != self._feature_names:
-            print(
-                "Warning: features of 'dtbl' do not match object. "\
-                +"Changing dtbl accordingly... "
-            )
-            #Warning for changing the test object
-            dtbl.change_vocabulary(self._feature_names)
-
-        return self.__per_doc_Pvals_LOO(dtbl._dtm)
 
     def change_vocabulary(self, new_vocabulary):
         """ Shift and remove columns of self._dtm so that it 
@@ -292,7 +217,7 @@ class DocTermTable(object):
         s = self._counts + s1
         for r in dtm_all:
             c = np.squeeze(np.array(r.todense()))  #no dense
-            pv = two_counts_pvals(c, s - c)
+            pv = two_counts_pvals(c, s - c, randomize=self._randomize)
             pv_list += [pv]
 
         return pv_list
@@ -383,19 +308,21 @@ class DocTermTable(object):
         return cosine_sim(cnt0, cnt1)
 
     def get_HC_rank_features(self,
-        dtbl,                   #type: DocTermTable
+        dtbl,           #type: DocTermTable
         LOO=False,             
-        features_to_mask = [],  
         within=False,
         stbl=None               
                             ):
         """ returns the HC score of dtm1 wrt to doc-term table,
         as well as its rank among internal scores 
         Args:
-            stbl -- indicates type of HC statistic
             LOO -- Leave One Out evaluation of the rank (much slower process
                     but more accurate; especially when number of documents
                     is small)
+            stbl -- indicates type of HC statistic
+            within -- indicate whether tested table is included in current 
+                    DocTermTable object. if within==True then tested _count
+                    are subtracted from DocTermTable._dtm
          """
 
         if stbl == None:
@@ -404,23 +331,19 @@ class DocTermTable(object):
         pvals = self._get_Pvals(dtbl.get_counts(), within=within)
 
         # ignore features within 'features_to_mask':
-        for f in features_to_mask :
-            try :
-                pvals[self._feature_names.index(f)] = np.nan
-            except :
-                None
-
+    
         HC, p_thr = hc_vals(pvals, stbl=stbl)
 
         pvals[np.isnan(pvals)] = 1
         feat = np.array(self._feature_names)[pvals < p_thr]
 
         if (LOO == False) or (within == True):
-            # internal pvals are evaluated in a LOO manner
+            # internal pvals are always evaluated in a LOO manner
             lo_hc = self._internal_scores
-            if len(lo_hc) > 0:
+            if len(lo_hc) > 0: # at least 1 doc
                 s = np.sum(np.array(lo_hc) < HC) 
-                rank = s / (len(lo_hc) + 1 - within)
+                #rank = s / (len(lo_hc) + 1 - within)
+                rank = s / len(lo_hc)
             else:
                 rank = np.nan
             if (stbl != self._stbl):
@@ -430,7 +353,7 @@ class DocTermTable(object):
                      )
 
         elif LOO == True :
-            loo_Pvals = self.per_doc_Pvals_LOO(dtbl)[1:]
+            loo_Pvals = self.__per_doc_Pvals_LOO(dtbl._dtm)[1:]
               #remove first item (corresponding to test sample)
 
             lo_hc = []
@@ -443,8 +366,10 @@ class DocTermTable(object):
 
             if len(lo_hc) > 0:
                 s = np.sum(np.array(lo_hc) < HC) 
-                rank = s / (len(lo_hc) + 1 - within)
+                #rank = s / (len(lo_hc) + 1 - within)
+                rank = s / len(lo_hc)
             else:
                 rank = np.nan
 
         return HC, rank, feat
+

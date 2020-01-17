@@ -39,10 +39,12 @@ class DocTermTable(object):
         self._dtm = dtm  #: doc-term-table (matrix)
         self._stbl = stbl  #: type of HC score to use 
         self._randomize = randomize #: randomize P-values or not
+        self._alpha = 0.15 # alpha parameter for HC statistic
+        self._pval_thresh = 1 #only consider P-values smaller than this
 
         if dtm.sum() == 0:
             raise ValueError(
-                "seems like all counts are zero. "\
+                "Seems like all counts are zero. "\
                 +"Did you pass the wrong data format?"
             )
 
@@ -62,7 +64,7 @@ class DocTermTable(object):
         for row in self._dtm:
             cnt = np.squeeze(np.array(row.sum(0)).astype(int))
             pv = self._get_Pvals(cnt, within = True)
-            hc, p_thr = hc_vals(pv, stbl=self._stbl, alpha=0.45)
+            hc, p_thr = self.__compute_HC(pv)
             self._internal_scores += [hc]
 
     def __per_doc_Pvals(self):
@@ -80,6 +82,10 @@ class DocTermTable(object):
             pv_list += [pv]
 
         return pv_list
+
+    def __compute_HC(self, pvals) :
+        pv = pvals[pvals < self._pval_thresh]
+        return hc_vals(pv, stbl=self._stbl, alpha=self._alpha)
 
     def get_feature_names(self):
         return self._feature_names
@@ -111,9 +117,11 @@ class DocTermTable(object):
             cnt2 = cnt0 - cnt1
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
-            pv = two_counts_pvals(cnt1, cnt2, randomize=self._randomize)
+            pv = two_counts_pvals(cnt1, cnt2,
+                     randomize=self._randomize)
         else:
-            pv = two_counts_pvals(cnt1, cnt0, randomize=self._randomize)
+            pv = two_counts_pvals(cnt1, cnt0,
+                 randomize=self._randomize)
         return pv 
 
     def _get_counts(self, dtbl, within=False) :
@@ -179,7 +187,10 @@ class DocTermTable(object):
             stbl = self._stbl
 
         cnt0, cnt1 = self._get_counts(dtbl, within=within)
-        df = two_sample_test(cnt0, cnt1, stbl=stbl, randomize=randomize)
+        df = two_sample_test(cnt0, cnt1,
+             stbl=stbl,
+            randomize=randomize,
+            alpha=self._alpha)
         df.loc[:,'feat'] = self._feature_names
         return df
 
@@ -217,7 +228,8 @@ class DocTermTable(object):
         s = self._counts + s1
         for r in dtm_all:
             c = np.squeeze(np.array(r.todense()))  #no dense
-            pv = two_counts_pvals(c, s - c, randomize=self._randomize)
+            pv = two_counts_pvals(c, s - c,
+                         randomize=self._randomize)
             pv_list += [pv]
 
         return pv_list
@@ -311,8 +323,7 @@ class DocTermTable(object):
         dtbl,           #type: DocTermTable
         LOO=False,             
         within=False,
-        stbl=None               
-                            ):
+                        ):
         """ returns the HC score of dtm1 wrt to doc-term table,
         as well as its rank among internal scores 
         Args:
@@ -325,14 +336,13 @@ class DocTermTable(object):
                     are subtracted from DocTermTable._dtm
          """
 
-        if stbl == None:
-            stbl = self._stbl
+        stbl = self._stbl
         
         pvals = self._get_Pvals(dtbl.get_counts(), within=within)
 
         # ignore features within 'features_to_mask':
-    
-        HC, p_thr = hc_vals(pvals, stbl=stbl)
+
+        HC, p_thr = self.__compute_HC(pvals)
 
         pvals[np.isnan(pvals)] = 1
         feat = np.array(self._feature_names)[pvals < p_thr]
@@ -361,7 +371,7 @@ class DocTermTable(object):
                 raise ValueError("list of LOO Pvals is empty")
 
             for pv in loo_Pvals:
-                hc, _ = hc_vals(pv, stbl=stbl)
+                hc, _ = self.__compute_HC(pv)
                 lo_hc += [hc]
 
             if len(lo_hc) > 0:

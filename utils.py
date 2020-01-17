@@ -48,6 +48,8 @@ def n_most_frequenct_words_balanced(
         Returns n of the most frequent tokens by each author 
         in the corpus represented by the dataframe df.
 
+        Takes approximately equals number of words from each author
+
         df has columns 'author', 'text', 'doc_id'
 
     """

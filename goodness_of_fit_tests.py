@@ -1,4 +1,4 @@
-from scipy.stats import chi2_contingency, ks_2samp
+from scipy.stats import chi2_contingency, ks_2samp, norm
 from scipy.spatial.distance import cosine
 import numpy as np
 
@@ -35,3 +35,22 @@ def cosine_sim(c1, c2):
     (c1 and c2 are assumed to be numpy arrays of equal length)
     """
     return cosine(c1, c2)
+
+
+def z_test(n1, n2, T1, T2):
+    p = (n1 + n2) / (T1 + T2)  #pooled prob of success
+    se = np.sqrt(p * (1 - p) * (1. / T1 + 1. / T2))
+    return (n1 / T1 - n2 / T2) / se
+
+
+def two_sample_proportion(c1, c2) :
+    T1 = c1.sum()
+    T2 = c2.sum()
+    
+    p = (c1 + c2) / (T1 + T2) #pooled prob of success
+    se = np.sqrt(p * (1 - p) * (1. / T1 + 1. / T2)) #pooled std
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        z = np.divide(n1 / T1 - n2 / T2, se)
+    
+    return 2*norm.cdf(-np.abs(z))

@@ -16,8 +16,7 @@ def hc_vals(pv, alpha=0.45, stbl=True):
     Parameters:
         pv -- list of p-values. P-values that are np.nan are exluded.
         alpha -- lower fruction of p-values to use.
-        stbl -- use expected p-value ordering (stbl=True) or observed 
-                (stbl=False)
+        stbl -- use expected p-value ordering (stbl=True) or observed (stbl=False)
 
     Return :
         hc_star -- sample adapted HC (HC\dagger in [1])
@@ -28,8 +27,9 @@ def hc_vals(pv, alpha=0.45, stbl=True):
     """
     pv = np.asarray(pv)
     n = len(pv)  #number of features including NA
-    pv = pv[~np.isnan(pv)]  
+    pv = pv[~np.isnan(pv)] 
     #n = len(pv)
+    n_pv = len(pv)
     hc_star = np.nan
     p_star = np.nan
 
@@ -37,7 +37,8 @@ def hc_vals(pv, alpha=0.45, stbl=True):
         ps_idx = np.argsort(pv)
         ps = pv[ps_idx]  #sorted pvals
 
-        uu = np.linspace(1 / n, 0.999, n)  #expectation of p-values under H0
+        uu = np.linspace(1 / n, 0.999, n)  #approximate expectation of p-values
+        uu = uu[:n_pv] 
         i_lim_up = np.maximum(int(np.floor(alpha * n + 0.5)), 1)
 
         ps = ps[:i_lim_up]
@@ -64,8 +65,8 @@ def hc_vals(pv, alpha=0.45, stbl=True):
 
 def hc_vals_full(pv, alpha=0.45):
     pv = np.asarray(pv)
-    n = len(pv)
     pv = pv[~np.isnan(pv)]
+    n = len(pv)
     hc_star = np.nan
     p_star = np.nan
 
@@ -128,7 +129,7 @@ def hc_vals_full(pv, alpha=0.45):
     })
     return df
 
-def binom_test_two_sided_slow(x, n, p) :
+def binom_test_two_sided2(x, n, p) :
     #slower
     def my_func(r) :
         from scipy.stats import binom_test
@@ -143,29 +144,44 @@ def binom_test_two_sided_slow(x, n, p) :
 
     return pv
 
+def Anscomb_z_test(n1, n2) :
+    return 1 - norm.cdf(2*np.abs(np.sqrt(n1+3/8)-np.sqrt(n2+3/8)))
+
 def binom_test_two_sided(x, n, p) :
     x_low = n * p - np.abs(x-n*p)
     x_high = n * p + np.abs(x-n*p)
 
-    p_up = binom.cdf(x_low, n, p)\
-        + binom.sf(x_high-1, n, p)
-        
-    prob = np.minimum(p_up, 1)
-    return prob * (n != 0) + 1. * (n == 0)
+    prob = binom.cdf(x_low, n, p)\
+        + binom.sf(x_high, n, p)
+
+    return prob * (n!=0) + 1.* (n==0)
 
 def binom_test_two_sided_random(x, n, p) :
     x_low = n * p - np.abs(x-n*p)
     x_high = n * p + np.abs(x-n*p)
 
     p_up = binom.cdf(x_low, n, p)\
-        + binom.sf(x_high-1, n, p)
-    
-    p_down = binom.cdf(x_low-1, n, p)\
         + binom.sf(x_high, n, p)
+    
+    p_down = binom.cdf(x_low - 1, n, p)\
+        + binom.sf(x_high + 1, n, p)
     
     U = np.random.rand(x.shape[0])
     prob = np.minimum(p_down + (p_up-p_down)*U, 1)
-    return prob * (n != 0) + U * (n == 0)
+    return prob * (n != 0) + 1. * (n == 0)
+
+# def binom_test_two_sided_random(x, n, p) :
+#     x_low = n * p - np.abs(x-n*p)
+#     x_high = n * p + np.abs(x-n*p)
+
+#     p_up = binom.cdf(x_low, n, p)\
+#         + binom.cdf(n-x_high, n, 1-p)
+    
+#     p_down = binom.cdf(x_low-0.5, n, p)\
+#         + binom.cdf(n-x_high-0.5, n, 1-p)
+        
+#     prob = np.minimum(p_down + (p_up-p_down)*np.random.rand(x.shape[0]), 1)
+#     return prob * (n != 0) + 1. * (n == 0)
 
 def z_test(n1, n2, T1, T2):
     p = (n1 + n2) / (T1 + T2)  #pooled prob of success
@@ -186,16 +202,16 @@ def two_sample_test(
     counts['n2'] = Y
     T1 = counts['n1'].sum()
     T2 = counts['n2'].sum()
-    counts['p'] = (T1 - counts.n1) / (T1 + T2 - counts.n1 - counts.n2)
+    counts['p'] = (T1 - counts['n1']) / (T1 + T2 - counts['n1'] - counts['n2'])
 
     counts['T1'] = T1
     counts['T2'] = T2
 
     counts['pval'] = two_counts_pvals(
-        counts['n1'],
-        counts['n2'],
-        randomize=randomize
-        )
+                    counts['n1'],
+                    counts['n2'],
+                    randomize=randomize)
+
     counts['sign'] = np.sign(counts.n1 - (counts.n1 + counts.n2) * counts.p)
     hc_star, p_val_thresh = hc_vals(counts['pval'], alpha=alpha, stbl=stbl)
     counts['HC'] = hc_star
@@ -218,5 +234,16 @@ def two_counts_pvals(c1, c2, randomize=False):
         pvals = binom_test_two_sided(c1, c1 + c2, p)
 
     return pvals
+
+def _two_counts_pvals(c1, c2, randomize=False):
+    # feature by feature exact binomial test
+    T1 = c1.sum()
+    T2 = c2.sum()
+    p = (T1 - c1) / (T1 + T2 - c1 - c2)
+    
+    pvals = Anscomb_z_test(c1, c2)
+    
+    return pvals
+
 
 

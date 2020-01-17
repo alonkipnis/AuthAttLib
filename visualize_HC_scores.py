@@ -233,25 +233,22 @@ def plot_col(df, value, sign, wrt_authors = []) :
         )        
     return p
 
-def visualize_HCz(pvals, stbl = True) : 
+def visualize_HCz(pvals, stbl = True, alpha=0.2) : 
     from HC_aux import hc_vals_full
     
     n = len(pvals)
-    df_pvals = hc_vals_full(pvals)
+    df_pvals = hc_vals_full(pvals, alpha=alpha)
 
     if stbl :
         var = 'z_stbl'
     else :
         var = 'z'
 
+    
     p = (
     ggplot(aes(x = 'u', y = var),
-           data = df_pvals) + geom_smooth(color = 'blue'
+           data = df_pvals) + geom_line(color = 'blue'
            )
-    + geom_vline(
-    xintercept = df_pvals.u[df_pvals[df_pvals.pval > 1/n][var].idxmax()],
-    color = 'blue'
-                )
      + geom_vline(
     xintercept = df_pvals.u[df_pvals[var].idxmax()],
     color = 'green',

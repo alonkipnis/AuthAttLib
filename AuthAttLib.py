@@ -228,7 +228,11 @@ class AuthorshipAttributionMulti(object):
                         ignore_index=True)
         return df
 
-    def get_doc_stats(self, doc_id, author, wrt_authors = [], LOO = False) :
+    def get_doc_stats(self,
+     doc_id,
+     author,
+     wrt_authors = [],
+     LOO = False) :
         """ stats wrt to all authors in list wrt_authors of 
             a single document within the model. 
          """
@@ -237,11 +241,12 @@ class AuthorshipAttributionMulti(object):
             md0 = self._AuthorModel[author]
             lo_docs = md0.get_document_names()
             i = lo_docs[doc_id]
+            dtbl = md0.get_doc_as_table(doc_id)
         except ValueError:
-            print("Cannot find document {} by author {}".format(doc_id,author))
+            print("Document {} by author {}".format(doc_id,author)\
+                +"is either missing or contains no model features")
             return None
 
-        dtbl = md0.get_doc_as_table(doc_id)
 
         df = pd.DataFrame()
 
@@ -258,14 +263,14 @@ class AuthorshipAttributionMulti(object):
                     )
                 chisq, chisq_pval = md1.get_ChiSquare(dtbl,
                                                  within=True)
-                chisq23, chisq23_pval = md1.get_ChiSquare(dtbl,
+                chisq23, chisq23_pval = md1.get_ChiSquare(
+                    dtbl,
                     within=True,
                     lambda_="cressie-read")
-                KS, KS_pval = md1.get_KS(dtbl, within = True)
+                KS, KS_pval = md1.get_KS(dtbl, within=True)
                 cosine = md0.get_CosineSim(dtbl, within=True)
             else:
-                HC, rank, feat = md1.get_HC_rank_features(
-                    dtbl, LOO=LOO)
+                HC, rank, feat = md1.get_HC_rank_features(dtbl, LOO=LOO)
                 chisq, chisq_pval = md1.get_ChiSquare(dtbl)
 
                 chisq23, chisq23_pval = md1.get_ChiSquare(dtbl,
@@ -340,44 +345,6 @@ class AuthorshipAttributionMulti(object):
                  wrt_authors = wrt_authors,
                   LOO = LOO), ignore_index=True)
 
-                """
-                dtbl = md1.get_doc_as_table(dn)
-                if auth0 == auth1:
-                    HC, rank, feat = md0.get_HC_rank_features(
-                        dtbl, LOO=LOO, within=True
-                        )
-                    chisq, chisq_pval = md0.get_ChiSquare(dtbl,
-                                                     within=True)
-                    chisq23, chisq23_pval = md0.get_ChiSquare(dtbl,
-                        within=True,
-                        lambda_="cressie-read")
-                    KS, KS_pval = md0.get_KS(dtbl, within = True)
-                    cosine = md0.get_CosineSim(dtbl, within=True)
-                else:
-                    HC, rank, feat = md0.get_HC_rank_features(
-                        dtbl, LOO=LOO)
-                    chisq, chisq_pval = md0.get_ChiSquare(dtbl)
-
-                    chisq23, chisq23_pval = md0.get_ChiSquare(dtbl,
-                        lambda_="cressie-read")
-                    KS, KS_pval = md0.get_KS(dtbl)
-                    cosine = md0.get_CosineSim(dtbl)
-                df = df.append(
-                    {
-                        'doc_id': dn,
-                        'author': auth1,
-                        'wrt_author': auth0,
-                        'HC': HC,
-                        'chisq': chisq,
-                        'chisq_pval' : chisq_pval,
-                        'chisq23' : chisq23,
-                        'KS_pval' : KS_pval,
-                        'cosine': cosine,
-                        'HC_rank': rank,
-                        'feat': list(feat)
-                    },
-                    ignore_index=True)
-                """
         return df
 
     def predict_stats(self, x, wrt_authors=[], LOO=False):
@@ -426,7 +393,7 @@ class AuthorshipAttributionMulti(object):
                     'wrt_author': auth,
                     'HC': HC,
                     'chisq': chisq,
-                    'chisq_pval' : chisq_pval,
+                    'chisq_pval' : -chisq_pval,
                     'HC_rank': rank,
                     'feat': feat,
                     'cosine': cosine,
@@ -608,11 +575,11 @@ class AuthorshipAttributionMultiBinary(object):
         md1 = ap_model._AuthorModel[auth_pair[0]]
         md2 = ap_model._AuthorModel[auth_pair[1]]
         
-        _, _, feat = md1.get_HC_rank_features(md2, stbl=self._stbl)
+        _, _, feat = md1.get_HC_rank_features(md2)
         ap_model.reduce_features(list(feat))
         return ap_model._vocab
 
-    def predict(self, x, method='HC'):
+    def predict(self, x, method='HC', LOO=False):
         def predict_max(df1):
             # whoever has more votes or <UNK> in the 
             # case of a draw
@@ -623,7 +590,7 @@ class AuthorshipAttributionMultiBinary(object):
             else: #in the case of a draw
                 return '<UNK>'
 
-        df1 = self.predict_stats(x, LOO=False, method=method)
+        df1 = self.predict_stats(x, LOO=LOO, method=method)
 
         predict = predict_max(df1)
         return predict

@@ -51,6 +51,6 @@ def two_sample_proportion(c1, c2) :
     se = np.sqrt(p * (1 - p) * (1. / T1 + 1. / T2)) #pooled std
 
     with np.errstate(divide='ignore', invalid='ignore'):
-        z = np.divide(n1 / T1 - n2 / T2, se)
+        z = np.divide(c1 / T1 - c2 / T2, se)
     
     return 2*norm.cdf(-np.abs(z))

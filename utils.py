@@ -107,7 +107,7 @@ def frequent_words_tfidf(
         Returns no_words with LOWEST tf-idf score.
         Useful in removing proper names and rare words. 
     """
-
+    from sklearn.feature_extraction.text import TfidfVectorizer
     tfidf_vectorizer = TfidfVectorizer(analyzer='word',
                                        min_df=0,
                                        ngram_range = ngram_range,

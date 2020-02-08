@@ -9,9 +9,14 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
     Args: 
      c1, c2  -- two arrays of integers of equal length
     
-    Returns:
-        chisq -- centralized chi-square score (score - dof)
-        log of pvalue -- p-value
+    Returns
+    -------
+    chisq : chi-square score divided by degree of freedom. 
+            this normalization is useful in comparing multiple
+            chi-squared scores. See Ch. 9.6.2 in 
+            Yvonne M. M. Bishop, Stephen E. Fienberg, and Paul 
+            W. Holland ``Discrete Multivariate Analysis''  
+    log_pval : log of p-value
     """
     
     if (sum(c1) == 0) or (sum(c2) == 0) :
@@ -21,11 +26,14 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
         chisq, pval, dof, exp = chi2_contingency(
                                         obs[:,obs.sum(0)!=0],
                                         lambda_=lambda_
-                                                            )
-        return chisq / dof, np.log(pval) 
-        # we use chisq/dof as a way to compare multiple chi-saured
-        # scores. See Ch. 9.6.2 of ``Discrete Multivariate Analysis'' by
-        # Yvonne M. M. Bishop, Stephen E. Fienberg, and Paul W. Holland 
+                                            )
+        
+        if pval == 0:
+            Lpval = -np.inf
+        else :
+            Lpval = np.log(pval)
+        return chisq / dof, Lpval
+        
 
 def two_sample_KS(c1, c2) :
     """ 2-sample Kolmogorov-Smirnov test

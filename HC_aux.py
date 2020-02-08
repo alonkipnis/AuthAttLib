@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from scipy.stats import binom, norm
+from scipy.stats import binom, norm, poisson
 
 def hc_vals(pv, alpha=0.45, stbl=True):
     """
@@ -153,6 +153,15 @@ def binom_test_two_sided(x, n, p) :
     prob = np.minimum(p_up, 1)
     return prob * (n != 0) + 1. * (n == 0)
 
+
+def poisson_test_random(x, lmd) :
+    p_down = 1 - poisson.cdf(x, lmd)
+    p_up = 1 - poisson.cdf(x, lmd) + poisson.pmf(x, lmd)
+    U = np.random.rand(x.shape[0])
+    prob = np.minimum(p_down + (p_up-p_down)*U, 1)
+    return prob * (n != 0) + U * (n == 0)
+
+
 def binom_test_two_sided_random(x, n, p) :
     x_low = n * p - np.abs(x-n*p)
     x_high = n * p + np.abs(x-n*p)
@@ -166,11 +175,6 @@ def binom_test_two_sided_random(x, n, p) :
     U = np.random.rand(x.shape[0])
     prob = np.minimum(p_down + (p_up-p_down)*U, 1)
     return prob * (n != 0) + U * (n == 0)
-
-def z_test(n1, n2, T1, T2):
-    p = (n1 + n2) / (T1 + T2)  #pooled prob of success
-    se = np.sqrt(p * (1 - p) * (1. / T1 + 1. / T2))
-    return (n1 / T1 - n2 / T2) / se
 
 def two_sample_test(
     X,

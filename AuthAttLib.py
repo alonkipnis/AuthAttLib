@@ -2,7 +2,59 @@ import pandas as pd
 import numpy as np
 from tqdm import *
 from utils import to_docTermCounts, n_most_frequent_words
-from DocTermTable import DocTermTable
+from FreqTable import FreqTable
+
+
+class MultiTable(object) :
+    """
+    model for classification of frequency tables based on
+    frequency similarity
+
+    Args:
+        data -- is a list of frequency tables
+        vocab -- is a global vocabulary 
+        stbl -- a parameter determinining type of HC statistic.
+        randomize -- randomized P-values or not
+    """
+    def __init__(self, data, vocab=[], stbl=True, randomize=False) :
+        self._randomize=randomize
+        self._stbl=stbl
+        self._classifyer=None
+
+        self.sync_tables()
+
+        return None
+
+    def train_classifyer(method=None) :
+        "train classifyer"
+        return None
+
+    def sync_tables(self): 
+        "Synchronize vocabulary of all talbes"
+        return None
+
+    def predict(self, x, method='min_HC') :
+        "attribute table x to one of the classes"
+        return None
+
+    def intraclass_stats(self):
+        """Compute similarity of each pair of classes within the model."""
+        return None
+
+    def interclass_stats(self, wrt_cls = []):
+        """Compute similarity of each sample with respect to a class.
+        (use sample_stats on each sample in the dataset)
+
+        """
+        return None
+
+    def sample_stats(self, smp_id, cls_id, wrt_cls = [], LOO = False) :
+        """ stats wrt to all classes in list wrt_cls of 
+            a single sample within the model. 
+         """
+        return None
+            
+
 
 class AuthorshipAttributionMulti(object):
     """
@@ -45,7 +97,7 @@ class AuthorshipAttributionMulti(object):
                                this list
         """
 
-        self._AuthorModel = {}  #:  list of DocTermTable objects, one for
+        self._AuthorModel = {}  #:  list of FreqTable objects, one for
         #: each author.
         self._vocab = vocab  #: joint vocabulary for the model.
         self._ngram_range = ngram_range  #: the n-gram range of text
@@ -79,7 +131,7 @@ class AuthorshipAttributionMulti(object):
         #self.compute_author_models()
 
     def to_docTermTable(self, X, document_names=[]):
-        """Convert raw input X into a DocTermTable object. 
+        """Convert raw input X into a FreqTable object. 
 
         Override this fucntion to process other input format. 
 
@@ -89,7 +141,7 @@ class AuthorshipAttributionMulti(object):
                               of each text in X
 
         Returs:
-            DocTermTable object
+            FreqTable object
         """
 
         dtm, _ = to_docTermCounts(X,
@@ -100,9 +152,9 @@ class AuthorshipAttributionMulti(object):
             dtm = dtm.sum(0)
             document_names = ["Sum of {} docs".format(len(document_names))]
 
-        return DocTermTable(dtm,
+        return FreqTable(dtm,
                     feature_names=self._vocab,
-                    document_names=document_names,
+                    sample_ids=document_names,
                     stbl=self._stbl,
                     randomize=self._randomize
                     )
@@ -220,8 +272,8 @@ class AuthorshipAttributionMulti(object):
                             'chisq': chisq,
                             'chisq_pval' : chisq_pval,
                             'cosine': cosine,
-                            'no_docs (author)': len(md1.get_document_names()),
-                            'no_docs (wrt_author)': len(md0.get_document_names()),
+                            'no_docs (author)': len(md1.get_sample_ids()),
+                            'no_docs (wrt_author)': len(md0.get_sample_ids()),
                             'no_tokens (author)': md1._counts.sum(),
                             'feat': list(feat)
                         },
@@ -239,9 +291,9 @@ class AuthorshipAttributionMulti(object):
 
         try :
             md0 = self._AuthorModel[author]
-            lo_docs = md0.get_document_names()
+            lo_docs = md0.get_sample_ids()
             i = lo_docs[doc_id]
-            dtbl = md0.get_doc_as_table(doc_id)
+            dtbl = md0.get_sample_as_table(doc_id)
         except ValueError:
             print("Document {} by author {}".format(doc_id,author)\
                 +"is either missing or contains no model features")
@@ -337,7 +389,7 @@ class AuthorshipAttributionMulti(object):
             md0 = self._AuthorModel[auth0]
             #for auth1 in self._AuthorModel:
             #    md1 = self._AuthorModel[auth1]
-            lo_docs = md0.get_document_names()
+            lo_docs = md0.get_sample_ids()
             for dn in lo_docs:
                 if verbose :
                     print("testing {} by {}".format(dn,auth0))
@@ -470,7 +522,7 @@ class AuthorshipAttributionMulti(object):
 
     def test_against(self, x, wrt_authors = [], stbl=None) :
         """ 
-        two sample test of x agaist the corpora in the list 
+        two sample test of x vs the corpora in the list 
         wrt_authors.
         
         Args:
@@ -496,10 +548,27 @@ class AuthorshipAttributionMulti(object):
         agg_model = None
         for auth in tqdm(wrt_authors):
             md = self._AuthorModel[auth]
-            agg_model = md.add_table(agg_model)
+            agg_model = md.add_table([agg_model])
             agg_model.collapse_dtm()
         
         return agg_model.two_table_test(xdtb, stbl=stbl)
+
+    def train_classifyer(self, classifyer) :
+        def dtm_to_featureset(dtm) :
+            fs = []
+            for sm_id in dtm.get_sample_ids() :
+                dtl = dtm.get_sample_as_table(sm_id)
+                fs += [dtl.get_featureset()]
+            return fs
+
+        train_set = []
+        for auth in self._AuthorModel :
+                md =  self._AuthorModel[auth]
+                fs = dtm_to_featureset(md)
+                train_set += [(f, auth) for f in fs]
+
+        classifyer.train(train_set)
+
 
     
 class AuthorshipAttributionMultiBinary(object):

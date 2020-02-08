@@ -22,7 +22,10 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
                                         obs[:,obs.sum(0)!=0],
                                         lambda_=lambda_
                                                             )
-        return chisq - dof, np.log(pval)
+        return chisq / dof, np.log(pval) 
+        # we use chisq/dof as a way to compare multiple chi-saured
+        # scores. See Ch. 9.6.2 of ``Discrete Multivariate Analysis'' by
+        # Yvonne M. M. Bishop, Stephen E. Fienberg, and Paul W. Holland 
 
 def two_sample_KS(c1, c2) :
     """ 2-sample Kolmogorov-Smirnov test

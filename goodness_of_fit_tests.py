@@ -27,7 +27,6 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
                                         obs[:,obs.sum(0)!=0],
                                         lambda_=lambda_
                                             )
-        
         if pval == 0:
             Lpval = -np.inf
         else :

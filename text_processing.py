@@ -7,12 +7,11 @@ from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer 
 
 
-
-
 def remove_parts_of_speach(text, 
-                        to_remove = ('NNP', 'NNPS', 'CD'),
-                        lemmatize = True) :
-
+                        to_remove=('NNP', 'NNPS', 'CD'),
+                        lemmatize=True,
+                        remove_punct=False
+                        ) :
     # 'NNP'-- proper noun, singluar
     # 'NNPS' -- proper noun, plural 
     # 'CD' -- cardinal digit
@@ -20,17 +19,21 @@ def remove_parts_of_speach(text,
     # 'PRP$' -- posessive pronoun
     # stem and remove numbers
     text_pos = nltk.pos_tag(nltk.word_tokenize(text))
+    
+    #from text_processing import remove_parts_of_speach
+    punct = [':',';','"','(',')','-',',','.','`','\`','!','?']
 
     if lemmatize :
         lemmatizer = WordNetLemmatizer() 
         lemmas = [lemmatizer.lemmatize(w[0]) for w in text_pos if \
-                  w[1] not in to_remove and 
-                  (len(re.findall('[0-9]',w[0])) == 0)]
+                  not w[1] in to_remove and 
+                  (len(re.findall('[0-9]',w[0])) == 0) and 
+                  w[0] not in punct]
     else :
         lemmas = [w[0] for w in text_pos if \
                   w[1] not in to_remove and
-                (len(re.findall('[0-9]',w[0])) == 0)
-                  ]
+                (len(re.findall('[0-9]',w[0])) == 0) and
+                  w[0] not in punct]
     return " ".join(lemmas)
 
 def cleanhtml(raw_html):

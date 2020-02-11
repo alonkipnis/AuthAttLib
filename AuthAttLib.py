@@ -168,12 +168,8 @@ class AuthorshipAttributionMulti(object):
             print("Changing vocabulary for {}. Found {} relevant tokens."\
                 .format(auth, am._counts.sum()))
 
-    def predict(self,
-            x,
-            method='HC',
-            unk_thresh=1e6,
-            LOO=False
-            ):
+    def predict(self, x, method='HC',
+                unk_thresh=1e6, LOO=False):
         """
         Attribute text x with one of the authors or '<UNK>'. 
 
@@ -296,7 +292,7 @@ class AuthorshipAttributionMulti(object):
             dtbl = md0.get_sample_as_table(doc_id)
         except ValueError:
             print("Document {} by author {}".format(doc_id,author)\
-                +"is either missing or contains no model features")
+                +"has an empty set of features")
             return None
 
 
@@ -319,14 +315,14 @@ class AuthorshipAttributionMulti(object):
                     dtbl,
                     within=True,
                     lambda_="cressie-read")
-                cosine = md0.get_CosineSim(dtbl, within=True)
+                cosine = md1.get_CosineSim(dtbl, within=True)
             else:
                 HC, rank, feat = md1.get_HC_rank_features(dtbl, LOO=LOO)
                 chisq, chisq_pval = md1.get_ChiSquare(dtbl)
 
                 chisq23, chisq23_pval = md1.get_ChiSquare(dtbl,
                     lambda_="cressie-read")
-                cosine = md0.get_CosineSim(dtbl)
+                cosine = md1.get_CosineSim(dtbl)
             df = df.append(
                 {
                     'doc_id': doc_id,
@@ -565,7 +561,6 @@ class AuthorshipAttributionMulti(object):
                 train_set += [(f, auth) for f in fs]
 
         classifyer.train(train_set)
-
 
     
 class AuthorshipAttributionMultiBinary(object):

@@ -220,6 +220,7 @@ def two_counts_pvals(c1, c2, randomize=False):
         pvals = binom_test_two_sided_random(c1, c1 + c2, p)
     else :
         pvals = binom_test_two_sided(c1, c1 + c2, p)
+        #pvals = binom_test_two_sided_slow(c1, c1 + c2, p)
 
     return pvals
 

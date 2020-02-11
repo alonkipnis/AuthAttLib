@@ -319,7 +319,6 @@ class AuthorshipAttributionMulti(object):
                     dtbl,
                     within=True,
                     lambda_="cressie-read")
-                KS, KS_pval = md1.get_KS(dtbl, within=True)
                 cosine = md0.get_CosineSim(dtbl, within=True)
             else:
                 HC, rank, feat = md1.get_HC_rank_features(dtbl, LOO=LOO)
@@ -327,7 +326,6 @@ class AuthorshipAttributionMulti(object):
 
                 chisq23, chisq23_pval = md1.get_ChiSquare(dtbl,
                     lambda_="cressie-read")
-                KS, KS_pval = md0.get_KS(dtbl)
                 cosine = md0.get_CosineSim(dtbl)
             df = df.append(
                 {
@@ -338,7 +336,6 @@ class AuthorshipAttributionMulti(object):
                     'chisq': chisq,
                     'chisq_pval' : chisq_pval,
                     'chisq23' : chisq23,
-                    'KS_pval' : KS_pval,
                     'cosine': cosine,
                     'HC_rank': rank,
                     'feat': list(feat)

@@ -23,7 +23,8 @@ class FreqTable(object):
     """
     def __init__(self, dtm, feature_names=[],
             sparse=True, sample_ids=[], stbl=True,
-            randomize=False):
+            randomize=False,
+            alpha=0.1):
         """ 
         Parameters
         ---------- 
@@ -43,7 +44,7 @@ class FreqTable(object):
         self._dtm = dtm  #: doc-term-table (matrix)
         self._stbl = stbl  #: type of HC score to use 
         self._randomize = randomize #: randomize P-values or not
-        self._alpha = 0.35 # alpha parameter for HC statistic
+        self._alpha = alpha # alpha parameter for HC statistic
         self._pval_thresh = 1 #only consider P-values smaller than this
 
         if dtm.sum() == 0:
@@ -322,16 +323,6 @@ class FreqTable(object):
         cnt0, cnt1 = self._get_counts(dtbl, within=within)
         return two_sample_chi_square(cnt0, cnt1, lambda_ = lambda_)
 
-    def get_KS(self, dtbl, within=False):
-        """ Kolmogorov-Smirnov test with respect to another FreqTable 
-        object 'dtbl'
-
-        Return:
-            statistics, pvalue
-        """
-        cnt0, cnt1 = self._get_counts(dtbl, within=within)
-        return two_sample_KS(cnt0, cnt1)
-
     def get_CosineSim(self, dtbl, within=False):
         """ Cosine similarity with respect to another FreqTable 
         object 'dtbl'
@@ -491,7 +482,7 @@ class NearestFreqTable(NeighborsBase) :
         y, _ = self.predict_prob(X, metric=metric, **kwards)
         return y
 
-    def accuracy(self, X, y) :
+    def score(self, X, y) :
         y_hat = self.predict(X)
         return np.mean(y_hat == y)
 

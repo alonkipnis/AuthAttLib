@@ -21,10 +21,8 @@ class FreqTable(object):
         - rank of ChiSquare in LOO
 
     """
-    def __init__(self, dtm, feature_names=[],
-            sparse=True, sample_ids=[], stbl=True,
-            randomize=False,
-            alpha=0.1):
+    def __init__(self, dtm, feature_names=[], sample_ids=[], stbl=True,
+            randomize=False, alpha=0.15):
         """ 
         Parameters
         ---------- 
@@ -40,6 +38,9 @@ class FreqTable(object):
         self._smp_ids = dict([
             (s, i) for i, s, in enumerate(sample_ids[:dtm.shape[0]])
         ])
+        self._sparse = scipy.sparse.issparse(dtm) # check if matrix is sparse
+        if len(feature_names) < dtm.shape[1] :
+            feature_names = np.arange(1,dtm.shape[1]+1).astype(str).tolist()
         self._feature_names = feature_names  #: feature name (list)
         self._dtm = dtm  #: doc-term-table (matrix)
         self._stbl = stbl  #: type of HC score to use 
@@ -67,7 +68,10 @@ class FreqTable(object):
         #pv_list = self.__per_smp_Pvals()
         self._internal_scores = []
         for row in self._dtm:
-            cnt = np.squeeze(np.array(row.sum(0)).astype(int))
+            if self._sparse : 
+                cnt = np.squeeze(np.array(row.todense())).astype(int)
+            else :
+                cnt = np.squeeze(np.array(row)).astype(int)
             pv = self._get_Pvals(cnt, within = True)
             hc, p_thr = self.__compute_HC(pv)
             self._internal_scores += [hc]
@@ -82,7 +86,10 @@ class FreqTable(object):
         if self._dtm.shape[0] == 1:  # internal score is undefined
             return []
         for r in self._dtm:
-            c = np.squeeze(np.array(r.todense()))
+            if self._sparse :
+                c = np.squeeze(np.array(r.todense()))
+            else :
+                c = np.squeeze(np.array(r))
             pv = two_counts_pvals(c, counts - c, randomize=self._randomize)
             pv_list += [pv]
 
@@ -103,9 +110,15 @@ class FreqTable(object):
     def get_per_sample_featureset(self) :
         ls = []
         for smp_id in self._smp_ids :
-            counts = np.squeeze(
+            if self._sparse :
+                counts = np.squeeze(
         np.array(self._dtm[self._smp_ids[smp_id], :].todense())
-            ).tolist() #get counts from a single line
+            ).tolist() 
+            else :
+                counts = np.squeeze(
+               np.array(self._dtm[self._smp_ids[smp_id], :])
+                    ).tolist() 
+            #get counts from a single line
             ls += [dict(zip(self._feature_names,counts))]
         return ls
 
@@ -219,9 +232,14 @@ class FreqTable(object):
         """ Shift and remove columns of self._dtm so that it 
         represents counts with respect to new_vocabulary
         """
-        new_dtm = scipy.sparse.lil_matrix(
+        if self._sparse :
+            new_dtm = scipy.sparse.lil_matrix(
             np.zeros((self._dtm.shape[0], len(new_vocabulary))))
+        else : 
+            new_dtm = np.zeros((self._dtm.shape[0],
+                                 len(new_vocabulary)))
         old_vocab = self._feature_names
+
 
         no_missing_words = 0
         for i, w in enumerate(new_vocabulary):
@@ -239,14 +257,20 @@ class FreqTable(object):
     def __per_smp_Pvals_LOO(self, dtm1):
         pv_list = []
 
-        dtm_all = vstack([dtm1, self._dtm]).tolil()
+        if self._sparse :
+            dtm_all = vstack([dtm1, self._dtm]).tolil()
+        else :     
+            dtm_all = np.concatenate([dtm1, self._dtm], axis = 0)
         #current sample corresponds to the first row in dtm_all
 
         #pvals when the removing one document at a time
         s1 = np.squeeze(np.array(dtm1.sum(0)))
         s = self._counts + s1
         for r in dtm_all:
-            c = np.squeeze(np.array(r.todense()))  #no dense
+            if self._sparse :
+                c = np.squeeze(np.array(r.todense()))  #no dense
+            else :
+                c = np.squeeze(np.array(r))
             pv = two_counts_pvals(c, s - c,
                          randomize=self._randomize)
             pv_list += [pv]
@@ -271,7 +295,13 @@ class FreqTable(object):
         return new_table
 
     def collapse_dtm(self) :
-        """sum all documents to a single one"""
+        """ Reduce table to a single row 
+        Returns
+        -------
+        new_table : new instance of FreqTable
+
+        """
+
         self._dtm = self._dtm.sum(0)
 
     def copy(self) :
@@ -303,11 +333,15 @@ class FreqTable(object):
 
             if curr_feat != feat1 :
                 dtbl = dtbl.change_vocabulary(feat)
-            try :
-                dtm_tall = vstack([self._dtm, dtbl._dtm]).tolil()
-            except :
-                dtm_tall = vstack([self._dtm, 
-                    coo_matrix(dtbl._dtm)]).tolil()
+
+            if self._sparse :
+                try :
+                    dtm_tall = vstack([self._dtm, dtbl._dtm]).tolil()
+                except :
+                    dtm_tall = vstack([self._dtm, 
+                        coo_matrix(dtbl._dtm)]).tolil()
+            else :
+                dtm_tall = np.concatenate([self._dtm, dtbl._dtm], axis=0)
 
             self._dtm=dtm_tall
             self._smp_ids.update(dtbl._smp_ids)
@@ -394,14 +428,19 @@ class FreqTable(object):
         return HC, rank, feat
 
 
-class NearestFreqTable(NeighborsBase) :
+
+class FreqTableClassifier(NeighborsBase) :
     """ nearset neighbor classifcation for frequency tables 
 
     """
 
-    def __init__(self):
+    def __init__(self, stbl = True, alpha=0.2, randomize=False):
         self._inf = 1e6
-        self._data_dic = {}
+        self._class_tables = {}
+        self._stbl = stbl
+        self._alpha = alpha
+        self._randomize = randomize
+        self._sparse = False
 
     def fit(self, X, y) :                
         """ store data in a way convinient for similarity evaluation
@@ -410,19 +449,22 @@ class NearestFreqTable(NeighborsBase) :
         y : array of shape [n_queries] 
             Class labels for each data sample.
         """
+        
+        self._sparse = scipy.sparse.issparse(X[0])
+        
         temp_dt = {}
-        for x, yi in zip(X,y) :
-            if yi in temp_dt:
-                temp_dt[yi] += [x]
+        for x, cls_name in zip(X,y) :
+            if cls_name in temp_dt:
+                temp_dt[cls_name] += [x]
             else :
-                temp_dt[yi] = [x]
+                temp_dt[cls_name] = [x]
                 
-        for yi in temp_dt :
-            temp_dt[yi][0].add_tables(temp_dt[yi][1:])
-            self._data_dic[yi] = temp_dt[yi][0]
+        for cls_name in temp_dt :
+            mat = np.array(temp_dt[cls_name])
+            self._class_tables[cls_name] = FreqTable(mat, alpha=self._alpha)
         
     
-    def predict_prob(self, X, metric='HC', **kwargs) :
+    def predict_prob(self, X, metric='HC') :
         """Predict the class labels for the provided data.
         Parameters
         ----------
@@ -432,11 +474,10 @@ class NearestFreqTable(NeighborsBase) :
         -------
         y : array of shape [n_queries] 
             Class labels for each data sample.
-        """
-        
+        """ 
         
         def sim_HC(x1, x2) :
-            r = x1.two_table_test(x2, **kwargs)
+            r = x1.two_table_test(x2, stbl=self._stbl, randomize=self._randomize)
             return r['HC'].values[0]
 
         def chisq(x1, x2) :
@@ -455,10 +496,11 @@ class NearestFreqTable(NeighborsBase) :
         y_pred = []
         y_score = []
         for x in X :
+            dtbl = FreqTable(np.expand_dims(x,0))
             min_cls = None
             min_score = self._inf
-            for cls in self._data_dic :
-                curr_score = sim_measure(self._data_dic[cls], x)
+            for cls in self._class_tables :
+                curr_score = sim_measure(self._class_tables[cls], dtbl)
                 if curr_score < min_score :
                     min_score = curr_score
                     min_cls = cls
@@ -467,7 +509,7 @@ class NearestFreqTable(NeighborsBase) :
 
         return y_pred, y_score
 
-    def predict(self, X, metric='HC', **kwargs) :
+    def predict(self, X, metric='HC') :
         """Predict the class labels for the provided data.
         Parameters
         ----------
@@ -479,10 +521,12 @@ class NearestFreqTable(NeighborsBase) :
             Class labels for each data sample.
         """
         
-        y, _ = self.predict_prob(X, metric=metric, **kwards)
+        y, _ = self.predict_prob(X, metric=metric)
         return y
 
     def score(self, X, y) :
         y_hat = self.predict(X)
         return np.mean(y_hat == y)
 
+
+    

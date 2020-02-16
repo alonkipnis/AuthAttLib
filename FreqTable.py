@@ -494,7 +494,7 @@ class FreqTableClassifier(NeighborsBase) :
             return x1.get_ChiSquare(x2)[1]
 
         def cosine(x1, x2) :
-            return x1.get_cosineSim(x2)
+            return x1.get_CosineSim(x2)
 
         metric = self._metric
         if metric == 'chisq' :

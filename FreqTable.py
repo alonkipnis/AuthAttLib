@@ -10,26 +10,27 @@ class FreqTable(object):
     """ Interface for p-value, Higher Criticism (HC), and other tests
     of homogenity with with respect to a document-term matrix.
  
-    Args: 
-            dtm (sparse scipy matrix)-- doc-term matrix.
-            feature_names (list) -- list of names for each column of dtm.
-            sample_ids (list) -- list of names for each row of dtm.
-            stbl (boolean) -- type of HC statistic to use 
-            randomize (boolean) -- randomized P-values 
+    Parameters:
+    ---------- 
+    dtm : doc-term matrix.
+    feature_names : list of names for each column of dtm.
+    sample_ids :  list of names for each row of dtm.
+    stbl : boolean) -- type of HC statistic to use 
+    randomize : boolean -- randomized P-values 
+    alpha  : boolean 
 
     To Do:
         - rank of ChiSquare in LOO
 
     """
-    def __init__(self, dtm, feature_names=[], sample_ids=[], stbl=True,
-            randomize=False, alpha=0.15):
+    def __init__(self, dtm, feature_names=[], sample_ids=[],
+        stbl=True, alpha=0.2, randomize=False) :
         """ 
         Parameters
         ---------- 
         dtm : (sparse) doc-term matrix.
         feature_names : list of names for each column of dtm.
         sample_ids : list of names for each row of dtm.
-        stbl : type of HC statistic to use 
 
         """
 
@@ -45,7 +46,8 @@ class FreqTable(object):
         self._dtm = dtm  #: doc-term-table (matrix)
         self._stbl = stbl  #: type of HC score to use 
         self._randomize = randomize #: randomize P-values or not
-        self._alpha = alpha # alpha parameter for HC statistic
+        self._alpha = alpha
+        #self._alpha = alpha # alpha parameter for HC statistic
         self._pval_thresh = 1 #only consider P-values smaller than this
 
         if dtm.sum() == 0:
@@ -90,14 +92,16 @@ class FreqTable(object):
                 c = np.squeeze(np.array(r.todense()))
             else :
                 c = np.squeeze(np.array(r))
-            pv = two_counts_pvals(c, counts - c, randomize=self._randomize)
+            pv = two_counts_pvals(c, counts - c, 
+                            randomize=self._randomize)
             pv_list += [pv]
 
         return pv_list
 
     def __compute_HC(self, pvals) :
         pv = pvals[pvals < self._pval_thresh]
-        return hc_vals(pv, stbl=self._stbl, alpha=self._alpha)
+        return hc_vals(pv, stbl=self._stbl,
+             alpha=self._alpha)
 
     def get_feature_names(self):
         "returns name of each column in table"
@@ -152,10 +156,12 @@ class FreqTable(object):
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
             pv = two_counts_pvals(cnt1, cnt2,
-                     randomize=self._randomize)
+                     randomize=self._randomize,
+                     )
         else:
             pv = two_counts_pvals(cnt1, cnt0,
-                 randomize=self._randomize)
+                 randomize=self._randomize,
+                        )
         return pv 
 
     def _get_counts(self, dtbl, within=False) :
@@ -221,8 +227,8 @@ class FreqTable(object):
 
         cnt0, cnt1 = self._get_counts(dtbl, within=within)
         df = two_sample_test(cnt0, cnt1,
-             stbl=stbl,
-            randomize=randomize,
+             stbl=self._stbl,
+            randomize=self._randomize,
             alpha=self._alpha)
         df.loc[:,'feat'] = self._feature_names
         return df
@@ -272,7 +278,8 @@ class FreqTable(object):
             else :
                 c = np.squeeze(np.array(r))
             pv = two_counts_pvals(c, s - c,
-                         randomize=self._randomize)
+                         randomize=self._randomize,
+                            )
             pv_list += [pv]
 
         return pv_list
@@ -290,8 +297,8 @@ class FreqTable(object):
         dtm = self._dtm[self._smp_ids[smp_id], :]
         new_table = FreqTable(dtm,
                             feature_names=self._feature_names,
-                            sample_ids=[smp_id],
-                            stbl=self._stbl)
+                            sample_ids=[smp_id], alpha=self._alpha,
+                            randomize=self._randomize, stbl=self._stbl)
         return new_table
 
     def collapse_dtm(self) :
@@ -309,6 +316,7 @@ class FreqTable(object):
                      self._dtm,
                      feature_names=self._feature_names,
                      sample_ids=list(self._smp_ids.keys()), 
+                     alpha=self._alpha, randomize=self._randomize,
                      stbl=self._stbl)
         return new_table
 
@@ -381,8 +389,6 @@ class FreqTable(object):
                     FreqTable object. if within==True then tested _count
                     are subtracted from FreqTable._dtm
          """
-
-        stbl = self._stbl
         
         pvals = self._get_Pvals(dtbl.get_counts(), within=within)
 
@@ -400,12 +406,7 @@ class FreqTable(object):
                 rank = s / len(lo_hc)
             else:
                 rank = np.nan
-            if (stbl != self._stbl):
-                print("Warning: HC type stbl == {}"
-                     "does not match internal HC type."
-                     "Rank may be meaningless.".format(stbl)
-                     )
-
+            
         elif LOO == True :
             loo_Pvals = self.__per_smp_Pvals_LOO(dtbl._dtm)[1:]
               #remove first item (corresponding to test sample)
@@ -434,13 +435,19 @@ class FreqTableClassifier(NeighborsBase) :
 
     """
 
-    def __init__(self, stbl = True, alpha=0.2, randomize=False):
+    def __init__(self, metric='HC', **kwargs):
+        """
+        Parameters:
+        -----------
+        metric : string -- what similarity measure to use
+        **kwargs : argument to FreqTable
+        """
+        
         self._inf = 1e6
         self._class_tables = {}
-        self._stbl = stbl
-        self._alpha = alpha
-        self._randomize = randomize
         self._sparse = False
+        self._metric = metric
+        self._kwargs = kwargs
 
     def fit(self, X, y) :                
         """ store data in a way convinient for similarity evaluation
@@ -461,10 +468,10 @@ class FreqTableClassifier(NeighborsBase) :
                 
         for cls_name in temp_dt :
             mat = np.array(temp_dt[cls_name])
-            self._class_tables[cls_name] = FreqTable(mat, alpha=self._alpha)
+            self._class_tables[cls_name] = FreqTable(mat, **self._kwargs)
         
     
-    def predict_prob(self, X, metric='HC') :
+    def predict_prob(self, X) :
         """Predict the class labels for the provided data.
         Parameters
         ----------
@@ -477,7 +484,7 @@ class FreqTableClassifier(NeighborsBase) :
         """ 
         
         def sim_HC(x1, x2) :
-            r = x1.two_table_test(x2, stbl=self._stbl, randomize=self._randomize)
+            r = x1.two_table_test(x2)
             return r['HC'].values[0]
 
         def chisq(x1, x2) :
@@ -486,10 +493,16 @@ class FreqTableClassifier(NeighborsBase) :
         def chisq_pval(x1, x2) :
             return x1.get_ChiSquare(x2)[1]
 
+        def cosine(x1, x2) :
+            return x1.get_cosineSim(x2)
+
+        metric = self._metric
         if metric == 'chisq' :
             sim_measure = chisq
         elif metric == 'chisq_pval' :
             sim_measure = chisq_pval
+        elif metric == 'cosine' :
+            sim_measure = cosine
         else :
             sim_measure = sim_HC
         
@@ -509,7 +522,14 @@ class FreqTableClassifier(NeighborsBase) :
 
         return y_pred, y_score
 
-    def predict(self, X, metric='HC') :
+    def set_metric(self, metric, **kwargs) :
+        self._metric = metric
+        if kwargs != None :
+            self._kwargs = kwargs
+        #note: if changing kwargs may need to fit model again
+
+
+    def predict(self, X) :
         """Predict the class labels for the provided data.
         Parameters
         ----------
@@ -521,12 +541,10 @@ class FreqTableClassifier(NeighborsBase) :
             Class labels for each data sample.
         """
         
-        y, _ = self.predict_prob(X, metric=metric)
+        y, _ = self.predict_prob(X)
         return y
 
     def score(self, X, y) :
         y_hat = self.predict(X)
         return np.mean(y_hat == y)
-
-
     

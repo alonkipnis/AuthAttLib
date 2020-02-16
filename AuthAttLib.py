@@ -155,8 +155,9 @@ class AuthorshipAttributionMulti(object):
         return FreqTable(dtm,
                     feature_names=self._vocab,
                     sample_ids=document_names,
-                    stbl=self._stbl,
-                    randomize=self._randomize
+                    kwargs =
+                    {'stbl' : self._stbl,
+                    'randomize' : self._randomize}
                     )
 
     def compute_author_models(self):

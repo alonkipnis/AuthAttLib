@@ -82,6 +82,7 @@ class AuthorshipAttributionMulti(object):
                  stbl=True,
                  flat=False,
                  randomize=False,
+                 alpha=0.2
                  ):
         """
         Args:
@@ -105,6 +106,7 @@ class AuthorshipAttributionMulti(object):
         self._stbl = stbl  #:  type of HC statistic to use.
         self._flat = flat
         self._randomize = randomize #: randomize pvalue or not
+        self._alpha = alpha
 
         if len(self._vocab) == 0:  #common vocabulary
             vocab = n_most_frequent_words(list(data.text),
@@ -155,9 +157,9 @@ class AuthorshipAttributionMulti(object):
         return FreqTable(dtm,
                     feature_names=self._vocab,
                     sample_ids=document_names,
-                    kwargs =
-                    {'stbl' : self._stbl,
-                    'randomize' : self._randomize}
+                    stbl=self._stbl,
+                    randomize=self._randomize,
+                    alpha=self._alpha
                     )
 
     def compute_author_models(self):

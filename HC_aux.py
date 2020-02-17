@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.stats import binom, norm, poisson
 
-def hc_vals(pv, alpha=0.45, stbl=True):
+def hc_vals(pv, alpha=0.25, minPv='1/n', stbl=True):
     """
     Higher Criticism test (see
     [1] Donoho, D. L. and Jin, J.,
@@ -43,7 +43,10 @@ def hc_vals(pv, alpha=0.45, stbl=True):
         ps = ps[:i_lim_up]
         uu = uu[:i_lim_up]
         
-        i_lim_low = np.argmax(ps > 0.999/n)
+        if minPv == '1/n' :
+            i_lim_low = np.argmax(ps > 0.999/n)
+        else :
+            i_lim_low = minPv
 
         if stbl:
             z = (uu - ps) / np.sqrt(uu * (1 - uu)) * np.sqrt(n)
@@ -87,7 +90,7 @@ def hc_vals_full(pv, alpha=0.45):
         z_max = z[i_max]
 
         #compute HC
-        i_lim_low = np.argmax(ps > 0.99/n)
+        i_lim_low = 0 #np.argmax(ps > 0.99/n)
         # try:
         #     i_lim_low = np.arange(n)[ps > 0.99 / n][0]
         # except:

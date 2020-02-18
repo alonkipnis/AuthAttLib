@@ -64,8 +64,7 @@ def hc_vals(pv, alpha=0.25, minPv='1/n', stbl=True):
 
     return hc_star, p_star
 
-
-def hc_vals_full(pv, alpha=0.45):
+def hc_vals_full(pv, alpha=0.25):
     pv = np.asarray(pv)
     n = len(pv)
     pv = pv[~np.isnan(pv)]
@@ -85,36 +84,24 @@ def hc_vals_full(pv, alpha=0.45):
         z_stbl = (uu - ps) / np.sqrt(uu * (1 - uu)) * np.sqrt(n)
         z = (uu - ps) / np.sqrt(ps * (1 - ps)) * np.sqrt(n)
 
-        i_lim = np.maximum(int(np.floor(alpha * n + 0.5)), 1)
-        i_max = np.argmax(z[:i_lim])
-        z_max = z[i_max]
-
+        def get_HC(z, i_low, i_high) :
+            i_max = np.argmax(z[i_low:i_high]) + i_low
+            HC = z[i_max]
+            return HC, i_max
+            
         #compute HC
-        i_lim_low = 0 #np.argmax(ps > 0.99/n)
-        # try:
-        #     i_lim_low = np.arange(n)[ps > 0.99 / n][0]
-        # except:
-        #     i_lim_low = 0
+        HC, i_star = get_HC(z, 0, i_lim_up)
 
-        #i_max = np.argmax(z[:i_lim_up])
-        i_lim_up = max(i_lim_low + 1, i_lim_up)
+        HC_stbl, i_star_stbl = get_HC(z_stbl, 0, i_lim_up)
 
-        i_max_star = np.argmax(z[i_lim_low:i_lim_up]) + i_lim_low
-
-        hc_star = z[i_max_star]
-        p_star = ps[i_lim_low]
-
-        p_star_full = ps[np.argmax(z[:i_lim_up])]
-
-        #i_max = np.argmax(z_stbl[:i_lim_up])
-        i_max_star = np.argmax(z_stbl[i_lim_low:i_lim_up]) + i_lim_low
-
-        p_star_full_stbl = ps[np.argmax(z_stbl[:i_lim_up])]
-
-        hc_star_stbl = z_stbl[i_max_star]
-
-        p_star_stbl = ps[i_max_star]
-
+        i_lim_low_dagger=np.argmax(ps > 0.999/n)
+        i_lim_up_dagger = max(i_lim_low_dagger + 1, i_lim_up)
+        HC_dagger, i_star_dagger = get_HC(
+            z, i_lim_low_dagger, i_lim_up_dagger)
+        
+        HC_stbl_dagger, i_star_stbl_dagger = get_HC(
+            z_stbl, i_lim_low_dagger, i_lim_up_dagger)
+        
 
     import pandas as pd
     df = pd.DataFrame({
@@ -122,14 +109,17 @@ def hc_vals_full(pv, alpha=0.45):
         'z': z,
         'z_stbl': z_stbl,
         'u': uu,
-        'HC': hc_star,
-        'HC_stbl': hc_star_stbl,
-        'p_star_full' : p_star_full,
-        'p_star_full_stbl' : p_star_full_stbl,
-        'p_star': p_star,
-        'p_star_stbl': p_star_stbl
+        'HC': HC,
+        'HC_stbl': HC_stbl,
+        'HC_dagger' : HC_dagger,
+        'HC_stbl_dagger' : HC_stbl_dagger,
+        'thresh' : ps < ps[i_star],
+        'thresh_stbl' : ps < ps[i_star_stbl],
+        'thresh_dagger' : ps < ps[i_star_dagger],
+        'thresh_stbl_dagger' : ps < ps[i_star_stbl_dagger],
     })
     return df
+
 
 def binom_test_two_sided_slow(x, n, p) :
     #slower
@@ -179,13 +169,8 @@ def binom_test_two_sided_random(x, n, p) :
     prob = np.minimum(p_down + (p_up-p_down)*U, 1)
     return prob * (n != 0) + U * (n == 0)
 
-def two_sample_test(
-    X,
-    Y,
-    alpha=0.45,
-    stbl=True,
-    randomize=False
-    ):
+def two_sample_test(X, Y, alpha=0.25,
+                stbl=True, randomize=False):
     # Input: X, Y, are two lists of integers of equal length :
     # Output: data frame: "X, Y, T1, n2, T2, pval, pval_z, hc"
     counts = pd.DataFrame()

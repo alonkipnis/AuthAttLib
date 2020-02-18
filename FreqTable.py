@@ -227,7 +227,7 @@ class FreqTable(object):
 
         cnt0, cnt1 = self._get_counts(dtbl, within=within)
         df = two_sample_test(cnt0, cnt1,
-             stbl=self._stbl,
+             stbl=stbl,
             randomize=self._randomize,
             alpha=self._alpha)
         df.loc[:,'feat'] = self._feature_names

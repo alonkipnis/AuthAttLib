@@ -233,26 +233,29 @@ def plot_col(df, value, sign, wrt_authors = []) :
         )        
     return p
 
-def visualize_HCz(pvals, stbl = True, alpha=0.2) : 
-    from HC_aux import hc_vals_full
-    
-    n = len(pvals)
+def visualize_HCz(pvals, stbl = True, dagger = True, alpha=0.2) : 
     df_pvals = hc_vals_full(pvals, alpha=alpha)
 
     if stbl :
+        th = 'thresh_stbl'
         var = 'z_stbl'
     else :
+        th = 'thresh'
         var = 'z'
-
+        
+    if dagger :
+        th = th + '_dagger'
+    
+    xint = df_pvals.u[df_pvals[th]].max()
+    ymax = df_pvals[var][~df_pvals[th]].max()
     
     p = (
     ggplot(aes(x = 'u', y = var),
-           data = df_pvals) + geom_line(color = 'blue'
-           )
+           data = df_pvals) + geom_line(color = 'blue')
      + geom_vline(
-    xintercept = df_pvals.u[df_pvals[var].idxmax()],
+    xintercept = xint,
     color = 'green',
     linetype = 'dashed'
-                ) 
+                ) + ylim(0,1.5*ymax) 
     )
     return p 

@@ -496,15 +496,35 @@ class FreqTableClassifier(NeighborsBase) :
         def cosine(x1, x2) :
             return x1.get_CosineSim(x2)
 
+        def LogLikelihood(x1, x2) :
+            return x1.get_ChiSquare(x2, lambda_ = "log-likelihood")[0]
+
+        def FreemanTukey(x1, x2) :
+            return x1.get_ChiSquare(x2, lambda_ = "freeman-tukey")[0]
+
+        def modLogLikelihood(x1, x2) :
+            return x1.get_ChiSquare(x2, lambda_ = "mod-log-likelihood")[0]
+
+        def Neyman(x1, x2) :
+            return x1.get_ChiSquare(x2, lambda_ = "neyman")[0]
+
+        def CressieRead(x1, x2) :
+            return x1.get_ChiSquare(x2, lambda_ = "cressie-read")[0]
+
         metric = self._metric
-        if metric == 'chisq' :
-            sim_measure = chisq
-        elif metric == 'chisq_pval' :
-            sim_measure = chisq_pval
-        elif metric == 'cosine' :
-            sim_measure = cosine
-        else :
-            sim_measure = sim_HC
+
+        lo_metrics = {'chisq' : chisq,
+                      'cosine' : cosine,
+                      'chisq_pval' : chisq_pval,
+                      'HC' : sim_HC,
+                      'LogLikelihood' : LogLikelihood,
+                      'FreemanTukey' : FreemanTukey,
+                      'modLogLikelihood' : modLogLikelihood,
+                      'Neyman' : Neyman,
+                      'CreddieRead' : CressieRead
+                     }
+        
+        sim_measure = lo_metrics[metric]
         
         y_pred = []
         y_score = []

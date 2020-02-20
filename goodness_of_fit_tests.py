@@ -22,8 +22,8 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
     
     Returns
     -------
-    chisq : score
-        chi-square score divided by degree of freedom. 
+    chisq : score 
+        score divided by degree of freedom. 
         this normalization is useful in comparing multiple
         chi-squared scores. See Ch. 9.6.2 in 
         Yvonne M. M. Bishop, Stephen E. Fienberg, and Paul 
@@ -35,10 +35,15 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
         return np.nan, 1
     else :
         obs = np.array([c1, c2])
+        if lambda_.isin(['mod-log-likelihood',
+                         'freeman-tukey',
+                          'neyman']) :
+            obs_nz = obs[:, (obs[0]!=0) & (obs[1]!=0)]
+        else :
+            obs_nz = obs[:, (obs[0]!=0) | (obs[1]!=0)]
+
         chisq, pval, dof, exp = chi2_contingency(
-                                        obs[:,obs.sum(0)!=0],
-                                        lambda_=lambda_
-                                            )
+                                    obs_nz, lambda_=lambda_)
         if pval == 0:
             Lpval = -np.inf
         else :
@@ -63,7 +68,6 @@ def z_test(n1, n2, T1, T2):
     p = (n1 + n2) / (T1 + T2)  #pooled prob of success
     se = np.sqrt(p * (1 - p) * (1. / T1 + 1. / T2))
     return (n1 / T1 - n2 / T2) / se
-
 
 
 def two_sample_proportion(c1, c2) :

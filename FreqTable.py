@@ -517,11 +517,11 @@ class FreqTableClassifier(NeighborsBase) :
                       'cosine' : cosine,
                       'chisq_pval' : chisq_pval,
                       'HC' : sim_HC,
-                      'LogLikelihood' : LogLikelihood,
-                      'FreemanTukey' : FreemanTukey,
-                      'modLogLikelihood' : modLogLikelihood,
-                      'Neyman' : Neyman,
-                      'CreddieRead' : CressieRead
+                      'log-likelihood' : LogLikelihood,
+                      "freeman-tukey" : FreemanTukey,
+                      "mod-log-likelihood" : modLogLikelihood,
+                      "neyman" : Neyman,
+                      "cressie-read" : CressieRead
                      }
         
         sim_measure = lo_metrics[metric]

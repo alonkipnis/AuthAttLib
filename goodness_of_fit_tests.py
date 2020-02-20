@@ -35,9 +35,9 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
         return np.nan, 1
     else :
         obs = np.array([c1, c2])
-        if lambda_.isin(['mod-log-likelihood',
+        if lambda_ in ['mod-log-likelihood',
                          'freeman-tukey',
-                          'neyman']) :
+                          'neyman'] :
             obs_nz = obs[:, (obs[0]!=0) & (obs[1]!=0)]
         else :
             obs_nz = obs[:, (obs[0]!=0) | (obs[1]!=0)]

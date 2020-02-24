@@ -136,6 +136,14 @@ def binom_test_two_sided_slow(x, n, p) :
 
     return pv
 
+def poisson_test_random(x, lmd) :
+    p_down = 1 - poisson.cdf(x, lmd)
+    p_up = 1 - poisson.cdf(x, lmd) + poisson.pmf(x, lmd)
+    U = np.random.rand(x.shape[0])
+    prob = np.minimum(p_down + (p_up-p_down)*U, 1)
+    return prob * (n != 0) + U * (n == 0)
+
+
 def binom_test_two_sided(x, n, p) :
     x_low = n * p - np.abs(x-n*p)
     x_high = n * p + np.abs(x-n*p)
@@ -145,14 +153,6 @@ def binom_test_two_sided(x, n, p) :
         
     prob = np.minimum(p_up, 1)
     return prob * (n != 0) + 1. * (n == 0)
-
-
-def poisson_test_random(x, lmd) :
-    p_down = 1 - poisson.cdf(x, lmd)
-    p_up = 1 - poisson.cdf(x, lmd) + poisson.pmf(x, lmd)
-    U = np.random.rand(x.shape[0])
-    prob = np.minimum(p_down + (p_up-p_down)*U, 1)
-    return prob * (n != 0) + U * (n == 0)
 
 
 def binom_test_two_sided_random(x, n, p) :

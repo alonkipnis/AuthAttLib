@@ -314,17 +314,29 @@ class AuthorshipAttributionMulti(object):
                     )
                 chisq, chisq_pval = md1.get_ChiSquare(dtbl,
                                                  within=True)
-                chisq23, chisq23_pval = md1.get_ChiSquare(
+                CR, CR_pval = md1.get_ChiSquare(
                     dtbl,
                     within=True,
                     lambda_="cressie-read")
+
+                LL, LL_pval = md1.get_ChiSquare(
+                    dtbl,
+                    within=True,
+                    lambda_="log-likelihood")                
+
                 cosine = md1.get_CosineSim(dtbl, within=True)
             else:
                 HC, rank, feat = md1.get_HC_rank_features(dtbl, LOO=LOO)
                 chisq, chisq_pval = md1.get_ChiSquare(dtbl)
 
-                chisq23, chisq23_pval = md1.get_ChiSquare(dtbl,
+                CR, CR_pval = md1.get_ChiSquare(
+                    dtbl,
                     lambda_="cressie-read")
+
+                LL, LL_pval = md1.get_ChiSquare(
+                    dtbl,
+                    lambda_="log-likelihood")
+                
                 cosine = md1.get_CosineSim(dtbl)
             df = df.append(
                 {
@@ -334,7 +346,8 @@ class AuthorshipAttributionMulti(object):
                     'HC': HC,
                     'chisq': chisq,
                     'chisq_pval' : chisq_pval,
-                    'chisq23' : chisq23,
+                    'Cressie-Read' : CR,
+                    'log-likelihood' : LL,
                     'cosine': cosine,
                     'HC_rank': rank,
                     'feat': list(feat)

@@ -4,7 +4,7 @@ from scipy.sparse import vstack, coo_matrix
 from goodness_of_fit_tests import *
 from sklearn.neighbors.base import NeighborsBase
 
-from HC_aux import hc_vals, two_counts_pvals, two_sample_test
+from TwoSampleHC import hc_vals, two_sample_pvals, two_sample_test_df
 
 class FreqTable(object):
     """ Interface for p-value, Higher Criticism (HC), and other tests
@@ -92,7 +92,7 @@ class FreqTable(object):
                 c = np.squeeze(np.array(r.todense()))
             else :
                 c = np.squeeze(np.array(r))
-            pv = two_counts_pvals(c, counts - c, 
+            pv = two_sample_pvals(c, counts - c, 
                             randomize=self._randomize)
             pv_list += [pv]
 
@@ -155,11 +155,11 @@ class FreqTable(object):
             cnt2 = cnt0 - cnt1
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
-            pv = two_counts_pvals(cnt1, cnt2,
+            pv = two_sample_pvals(cnt1, cnt2,
                      randomize=self._randomize,
                      )
         else:
-            pv = two_counts_pvals(cnt1, cnt0,
+            pv = two_sample_pvals(cnt1, cnt0,
                  randomize=self._randomize,
                         )
         return pv 
@@ -226,7 +226,7 @@ class FreqTable(object):
             stbl = self._stbl
 
         cnt0, cnt1 = self._get_counts(dtbl, within=within)
-        df = two_sample_test(cnt0, cnt1,
+        df = two_sample_test_df(cnt0, cnt1,
              stbl=stbl,
             randomize=self._randomize,
             alpha=self._alpha)
@@ -277,7 +277,7 @@ class FreqTable(object):
                 c = np.squeeze(np.array(r.todense()))  #no dense
             else :
                 c = np.squeeze(np.array(r))
-            pv = two_counts_pvals(c, s - c,
+            pv = two_sample_pvals(c, s - c,
                          randomize=self._randomize,
                             )
             pv_list += [pv]

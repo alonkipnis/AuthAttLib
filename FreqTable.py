@@ -6,9 +6,67 @@ from sklearn.neighbors.base import NeighborsBase
 
 from TwoSampleHC import hc_vals, two_sample_pvals, two_sample_test_df
 
+#To do : complete class MultiTable
+
+# class MultiTable(object) :
+#     """
+#     model for classification of multiple frequency tables based on
+#     frequency similarity
+
+#     Args:
+#         data -- is a list of frequency tables
+#         vocab -- is a global vocabulary 
+#         stbl -- a parameter determinining type of HC statistic.
+#         randomize -- randomized P-values or not
+#     """
+#     def __init__(self, data, vocab=[], stbl=True, randomize=False) :
+#         self._randomize=randomize
+#         self._stbl=stbl
+#         self._classifyer=None
+
+#         self.sync_tables()
+
+#         return None
+
+#     def train_classifyer(method=None) :
+#         "train classifyer"
+#         return None
+
+#     def sync_tables(self): 
+#         "Synchronize all tables to the same vocabulary"
+#         return None
+
+#     def predict(self, x, method='min_HC') :
+#         "attribute table x to one of the classes"
+#         return None
+
+#     def intraclass_stats(self):
+#         """Compute similarity of each pair of classes within the model."""
+#         return None
+
+#     def interclass_stats(self, wrt_cls = []):
+#         """Compute similarity of each sample with respect to a class.
+#         (use sample_stats on each sample in the dataset)
+
+#         """
+#         return None
+
+#     def sample_stats(self, smp_id, cls_id, wrt_cls = [], LOO = False) :
+#         """ stats wrt to all classes in list wrt_cls of 
+#             a single sample within the model. 
+#          """
+#         return None
+
+
 class FreqTable(object):
-    """ Interface for p-value, Higher Criticism (HC), and other tests
-    of homogenity with with respect to a document-term matrix.
+    """ 
+    Represents 1-way contingency table of multiple dataset
+    Each feature has a unique name 
+    Each dataset has a unique name
+    Allows to check similarity of the table to other tables
+    using Higher Criticism (HC) and other statistics. Designed to 
+    accelerate computation of HC
+
  
     Parameters:
     ---------- 
@@ -246,7 +304,6 @@ class FreqTable(object):
                                  len(new_vocabulary)))
         old_vocab = self._feature_names
 
-
         no_missing_words = 0
         for i, w in enumerate(new_vocabulary):
             try:
@@ -294,7 +351,7 @@ class FreqTable(object):
         Returns:
             FreqTable object
         """
-        dtm = self._dtm[self._smp_ids[smp_id], :]
+        dtm = np.atleast_2d(self._dtm[self._smp_ids[smp_id], :])
         new_table = FreqTable(dtm,
                             feature_names=self._feature_names,
                             sample_ids=[smp_id], alpha=self._alpha,

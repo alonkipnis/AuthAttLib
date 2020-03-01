@@ -3,58 +3,7 @@ import numpy as np
 from tqdm import *
 from utils import to_docTermCounts, n_most_frequent_words
 from FreqTable import FreqTable
-
-
-class MultiTable(object) :
-    """
-    model for classification of frequency tables based on
-    frequency similarity
-
-    Args:
-        data -- is a list of frequency tables
-        vocab -- is a global vocabulary 
-        stbl -- a parameter determinining type of HC statistic.
-        randomize -- randomized P-values or not
-    """
-    def __init__(self, data, vocab=[], stbl=True, randomize=False) :
-        self._randomize=randomize
-        self._stbl=stbl
-        self._classifyer=None
-
-        self.sync_tables()
-
-        return None
-
-    def train_classifyer(method=None) :
-        "train classifyer"
-        return None
-
-    def sync_tables(self): 
-        "Synchronize vocabulary of all talbes"
-        return None
-
-    def predict(self, x, method='min_HC') :
-        "attribute table x to one of the classes"
-        return None
-
-    def intraclass_stats(self):
-        """Compute similarity of each pair of classes within the model."""
-        return None
-
-    def interclass_stats(self, wrt_cls = []):
-        """Compute similarity of each sample with respect to a class.
-        (use sample_stats on each sample in the dataset)
-
-        """
-        return None
-
-    def sample_stats(self, smp_id, cls_id, wrt_cls = [], LOO = False) :
-        """ stats wrt to all classes in list wrt_cls of 
-            a single sample within the model. 
-         """
-        return None
             
-
 
 class AuthorshipAttributionMulti(object):
     """
@@ -80,7 +29,6 @@ class AuthorshipAttributionMulti(object):
                  words_to_ignore=[],
                  ngram_range=(1, 1),
                  stbl=True,
-                 flat=False,
                  randomize=False,
                  alpha=0.2
                  ):
@@ -100,22 +48,26 @@ class AuthorshipAttributionMulti(object):
 
         self._AuthorModel = {}  #:  list of FreqTable objects, one for
         #: each author.
-        self._vocab = vocab  #: joint vocabulary for the model.
         self._ngram_range = ngram_range  #: the n-gram range of text
         #: in the model.
         self._stbl = stbl  #:  type of HC statistic to use.
-        self._flat = flat
         self._randomize = randomize #: randomize pvalue or not
         self._alpha = alpha
 
-        if len(self._vocab) == 0:  #common vocabulary
-            vocab = n_most_frequent_words(list(data.text),
+        #compute author-models
+        self.compute_author_models(data, vocab)
+        
+        #self.compute_author_models()
+
+    def compute_author_models(self, data, vocab) :
+        self._vocab = vocab  
+        if len(self._vocab) == 0:  #: form vocabulary form data
+            self._vocab = n_most_frequent_words(list(data.text),
                                           n=vocab_size,
                                           words_to_ignore=words_to_ignore,
                                           ngram_range=self._ngram_range)
-        self._vocab = vocab
 
-        #compute author-models
+
         lo_authors = pd.unique(data.author)
         for auth in lo_authors:
             data_auth = data[data.author == auth]
@@ -130,7 +82,6 @@ class AuthorshipAttributionMulti(object):
             .format(len(data_auth),
                 self._AuthorModel[auth]._counts.sum()))
 
-        #self.compute_author_models()
 
     def to_docTermTable(self, X, document_names=[]):
         """Convert raw input X into a FreqTable object. 
@@ -150,9 +101,6 @@ class AuthorshipAttributionMulti(object):
                             vocab=self._vocab,
                             ngram_range=self._ngram_range)
 
-        if self._flat == True:
-            dtm = dtm.sum(0)
-            document_names = ["Sum of {} docs".format(len(document_names))]
 
         return FreqTable(dtm,
                     feature_names=self._vocab,
@@ -162,7 +110,7 @@ class AuthorshipAttributionMulti(object):
                     alpha=self._alpha
                     )
 
-    def compute_author_models(self):
+    def recompute_author_models(self):
         """ compute author models after a change in vocab """
 
         for auth in self._AuthorModel:
@@ -355,7 +303,6 @@ class AuthorshipAttributionMulti(object):
                 ignore_index=True)
         return df
 
-
     def internal_stats(self, authors = [], 
             wrt_authors=[], LOO=False, verbose=False):
         """
@@ -527,7 +474,7 @@ class AuthorshipAttributionMulti(object):
             Update the model to a new set of features. 
         """
         self._vocab = new_feature_set
-        self.compute_author_models()
+        self.recompute_author_models()
 
     def test_against(self, x, wrt_authors = [], stbl=None) :
         """ 
@@ -578,13 +525,77 @@ class AuthorshipAttributionMulti(object):
 
         classifyer.train(train_set)
 
+
+class AuthorshipAttributionMultiDTM(AuthorshipAttributionMulti) :
+    """ 
+    Same as AuthorshipAttributionMulti but input is a 
+    pd.DataFrame of the form auth-doc-lemma
+
+    Overrides methods 'compute_author_models' and to_docTermTable
     
+    """
+    
+    def compute_author_models(self, ds, vocab) :
+        self._vocab = vocab  
+        
+        MIN_CNT = 3
+        if len(vocab) == 0 :
+            cnt = ds.term.value_counts() 
+            vocab = cnt[cnt >= MIN_CNT].index.tolist()
+        
+        lo_authors = pd.unique(ds.author)
+        for auth in lo_authors:
+            ds_auth = ds[ds.author == auth]
+            print("\t Creating author-model for {}...".format(auth))
+            
+            dtm = self.to_docTermTable(ds_auth)
+            dtm.change_vocabulary(new_vocabulary=vocab)
+            self._AuthorModel[auth] = dtm
+            print("\t\tfound {} documents and {} relevant tokens."\
+            .format(len(self._AuthorModel[auth]._smp_ids),
+                self._AuthorModel[auth]._counts.sum()))    
+    
+
+    def to_docTermTable(self, df):
+        """Convert raw input X into a FreqTable object. 
+
+        Override this fucntion to process other input format. 
+
+        Args:     
+            X -- list of texts 
+            document_names -- list of strings representing the names
+                              of each text in X
+
+        Returs:
+            FreqTable object
+        """
+        
+        def df_to_FreqTable(df) :
+            df = pd.DataFrame(df.groupby(['doc_id']).term.value_counts()).\
+                rename(columns={'term' : 'n'}).\
+                reset_index().\
+                pivot_table(index = 'doc_id', columns='term', values='n', fill_value=0)
+            feature_nams = df.columns.tolist()
+            document_names = df.index.tolist()
+            mat = df.to_numpy()
+            return mat, document_names, feature_nams
+
+        mat, dn, fn = df_to_FreqTable(df)
+        dtm = FreqTable(mat, feature_names=fn, sample_ids=dn,
+                    alpha = self._alpha, stbl=self._stbl,
+                    randomize=self._randomize)
+        return dtm
+
+
+
 class AuthorshipAttributionMultiBinary(object):
     """ Use pair-wise tests to determine most likely author. 
-        It does so by creating AuthorshipAttributionMulti object for each 
-        pair of authors and reduces the features of this object. 
+        (creates an AuthorshipAttributionMulti object for each 
+        pair of authors and reduces the features of this object) 
 
         The interface is similar to AuthorshipAttributionMultiBinary
+        except that prediction can be made by majority voting.
+
     """
     def __init__(
             self,
@@ -692,3 +703,4 @@ class AuthorshipAttributionMultiBinary(object):
                 },
                 ignore_index=True)
         return df
+

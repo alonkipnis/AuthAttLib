@@ -84,7 +84,7 @@ class FreqTable(object):
     def __init__(self, dtm, feature_names=[], sample_ids=[],
         stbl=True, alpha=0.2, randomize=False) :
         """ 
-        Parameters
+        Args
         ---------- 
         dtm : (sparse) doc-term matrix.
         feature_names : list of names for each column of dtm.
@@ -98,10 +98,14 @@ class FreqTable(object):
             (s, i) for i, s, in enumerate(sample_ids[:dtm.shape[0]])
         ])
         self._sparse = scipy.sparse.issparse(dtm) # check if matrix is sparse
+
         if len(feature_names) < dtm.shape[1] :
             feature_names = np.arange(1,dtm.shape[1]+1).astype(str).tolist()
         self._feature_names = feature_names  #: feature name (list)
-        self._dtm = dtm  #: doc-term-table (matrix)
+        if not self._sparse :
+            self._dtm = np.matrix(dtm)  #: doc-term-table (matrix)
+        else :
+            self._dtm = dtm
         self._stbl = stbl  #: type of HC score to use 
         self._randomize = randomize #: randomize P-values or not
         self._alpha = alpha
@@ -114,16 +118,19 @@ class FreqTable(object):
                 +"Did you pass the wrong data format?"
             )
 
+        
         self.__compute_internal_stat()
 
 
     def __compute_internal_stat(self, compute_pvals=True):
-        """summarize internal doc-term-table"""
-
-        self._terms_per_doc = np.squeeze(np.array(
-            self._dtm.sum(1))).astype(int)
-        self._counts = np.squeeze(np.array(self._dtm.sum(0))).astype(int)
-
+        """ summarize internal doc-term-table """
+        #import pdb; pdb.set_trace()
+        
+        self._terms_per_doc = np.asarray(self._dtm.sum(1).ravel())\
+                            .squeeze().astype(int)
+        self._counts = np.asarray(self._dtm.sum(0).ravel())\
+                    .squeeze().astype(int)
+        
         #keep HC score of each row w.r.t. the rest
         #pv_list = self.__per_smp_Pvals()
         self._internal_scores = []
@@ -291,7 +298,6 @@ class FreqTable(object):
         df.loc[:,'feat'] = self._feature_names
         return df
 
-
     def change_vocabulary(self, new_vocabulary):
         """ Shift and remove columns of self._dtm so that it 
         represents counts with respect to new_vocabulary
@@ -306,9 +312,12 @@ class FreqTable(object):
 
         no_missing_words = 0
         for i, w in enumerate(new_vocabulary):
+            #import pdb; pdb.set_trace()
             try:
-                new_dtm[:, i] = self._dtm[:, old_vocab.index(w)]
-            except:  # occurs if a word in the
+                new_dtm[:, i] = np.asarray(
+                    self._dtm[:, old_vocab.index(w)]
+                                        ).ravel()
+            except:  # num of words in 
                 # new vocabulary does not exists in old one.
                 no_missing_words += 1
 
@@ -351,7 +360,11 @@ class FreqTable(object):
         Returns:
             FreqTable object
         """
-        dtm = np.atleast_2d(self._dtm[self._smp_ids[smp_id], :])
+        if self._sparse :
+            dtm = self._dtm[self._smp_ids[smp_id], :]
+        else :
+            dtm = np.atleast_2d(self._dtm[self._smp_ids[smp_id], :])
+
         new_table = FreqTable(dtm,
                             feature_names=self._feature_names,
                             sample_ids=[smp_id], alpha=self._alpha,

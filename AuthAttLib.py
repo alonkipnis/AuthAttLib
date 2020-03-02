@@ -22,16 +22,9 @@ class AuthorshipAttributionMulti(object):
         words_to_ignore -- tell tokenizer to ignore words in
                            this list.
     """
-    def __init__(self,
-                 data,
-                 vocab=[],
-                 vocab_size=100,
-                 words_to_ignore=[],
-                 ngram_range=(1, 1),
-                 stbl=True,
-                 randomize=False,
-                 alpha=0.2
-                 ):
+    def __init__(self, data, vocab=[], stbl=True,
+                 randomize=False, alpha=0.2, **kwargs
+                ) :
         """
         Args:
             data -- is a DataFrame with columns doc_id|author|text
@@ -48,33 +41,36 @@ class AuthorshipAttributionMulti(object):
 
         self._AuthorModel = {}  #:  list of FreqTable objects, one for
         #: each author.
-        self._ngram_range = ngram_range  #: the n-gram range of text
+        self._ngram_range = kwargs.get('ngram_range', (1,1))  #: ng-range used
         #: in the model.
         self._stbl = stbl  #:  type of HC statistic to use.
         self._randomize = randomize #: randomize pvalue or not
         self._alpha = alpha
 
+        self._vocab = vocab
+        if len(self._vocab) == 0 : #get vocabulary unless supplied
+            self._get_vocab(data, **kwargs)
         #compute author-models
-        self.compute_author_models(data, vocab)
-        
-        #self.compute_author_models()
+        self._compute_author_models(data)
 
-    def compute_author_models(self, data, vocab) :
-        self._vocab = vocab  
-        if len(self._vocab) == 0:  #: form vocabulary form data
-            self._vocab = n_most_frequent_words(list(data.text),
-                                          n=vocab_size,
-                                          words_to_ignore=words_to_ignore,
-                                          ngram_range=self._ngram_range)
+    def _get_vocab(self, data, **kwargs) :
+        # create vocabulary form data
+        # use most frequent words
+        self._vocab = n_most_frequent_words(
+              list(data.text), 
+              n= kwargs.get('vocab_size', 100),
+              words_to_ignore=kwargs.get('words_to_ignore', []),
+              ngram_range=kwargs.get('ngram_range', (1,1))
+              )
 
-
+    def _compute_author_models(self, data) :        
         lo_authors = pd.unique(data.author)
         for auth in lo_authors:
             data_auth = data[data.author == auth]
             print("\t Creating author-model for {} using {} features..."\
                 .format(auth, len(self._vocab)))
 
-            self._AuthorModel[auth] = self.to_docTermTable(
+            self._AuthorModel[auth] = self._to_docTermTable(
                                 list(data_auth.text),
                                 document_names=list(data_auth.doc_id)
                                 )
@@ -83,7 +79,7 @@ class AuthorshipAttributionMulti(object):
                 self._AuthorModel[auth]._counts.sum()))
 
 
-    def to_docTermTable(self, X, document_names=[]):
+    def _to_docTermTable(self, X, document_names=[]):
         """Convert raw input X into a FreqTable object. 
 
         Override this fucntion to process other input format. 
@@ -110,7 +106,7 @@ class AuthorshipAttributionMulti(object):
                     alpha=self._alpha
                     )
 
-    def recompute_author_models(self):
+    def _recompute_author_models(self):
         """ compute author models after a change in vocab """
 
         for auth in self._AuthorModel:
@@ -152,7 +148,7 @@ class AuthorshipAttributionMulti(object):
         min_score = unk_thresh
         margin = unk_thresh
 
-        Xdtb = self.to_docTermTable([x])
+        Xdtb = self._to_docTermTable([x])
 
         for i, auth in enumerate(self._AuthorModel):
             am = self._AuthorModel[auth]
@@ -243,7 +239,7 @@ class AuthorshipAttributionMulti(object):
             dtbl = md0.get_sample_as_table(doc_id)
         except ValueError:
             print("Document {} by author {}".format(doc_id,author)\
-                +"has an empty set of features")
+                +" has empty set of features")
             return None
 
 
@@ -384,7 +380,7 @@ class AuthorshipAttributionMulti(object):
                     within the corpus.
         """
         # provides statiscs on decision wrt to test sample text
-        xdtb = self.to_docTermTable([x])
+        xdtb = self._to_docTermTable([x])
 
         if len(wrt_authors) == 0:
             # evaluate with resepct to all authors in the model
@@ -439,7 +435,7 @@ class AuthorshipAttributionMulti(object):
         for auth0 in tqdm(wrt_authors):
             md0 = self._AuthorModel[auth0]
             for r in data.iterrows() :
-                dtbl =  self.to_docTermTable([r[1].text])
+                dtbl =  self._to_docTermTable([r[1].text])
                 chisq, chisq_pval = md0.get_ChiSquare(dtbl)
                 cosine = md0.get_CosineSim(dtbl)
                 HC, rank, feat = md0.get_HC_rank_features(dtbl,
@@ -466,17 +462,16 @@ class AuthorshipAttributionMulti(object):
                    stbl=stbl,
                    within=within,
                    randomize=randomize
-                   )
-        
+                   )    
 
     def reduce_features(self, new_feature_set):
         """
             Update the model to a new set of features. 
         """
         self._vocab = new_feature_set
-        self.recompute_author_models()
+        self._recompute_author_models()
 
-    def test_against(self, x, wrt_authors = [], stbl=None) :
+    def test_against(self, x, wrt_authors = []) :
         """ 
         two sample test of x vs the corpora in the list 
         wrt_authors.
@@ -491,10 +486,7 @@ class AuthorshipAttributionMulti(object):
             data frame of counts, pvalues, and signed z scores
         """
 
-        if stbl == None :
-            stbl = self._stbl
-
-        xdtb = self.to_docTermTable([x])
+        xdtb = self._to_docTermTable([x])
 
         if len(wrt_authors) == 0:
             # evaluate with resepct to all authors in the model
@@ -535,28 +527,35 @@ class AuthorshipAttributionMultiDTM(AuthorshipAttributionMulti) :
     
     """
     
-    def compute_author_models(self, ds, vocab) :
-        self._vocab = vocab  
-        
-        MIN_CNT = 3
-        if len(vocab) == 0 :
-            cnt = ds.term.value_counts() 
-            vocab = cnt[cnt >= MIN_CNT].index.tolist()
+    def _get_vocab(self, ds, **kwargs) :
+        """
+        Create shared vocabulary from data
+
+        Current version takes all words with at least MIN_CNT 
+        appearances
+        """
+
+        MIN_CNT = kwargs.get('min_cnt', 3)
+        cnt = ds.term.value_counts() 
+        vocab = cnt[cnt >= MIN_CNT].index.tolist()
+        self._vocab = vocab
+
+    def _compute_author_models(self, ds) :
         
         lo_authors = pd.unique(ds.author)
         for auth in lo_authors:
             ds_auth = ds[ds.author == auth]
             print("\t Creating author-model for {}...".format(auth))
             
-            dtm = self.to_docTermTable(ds_auth)
-            dtm.change_vocabulary(new_vocabulary=vocab)
+            dtm = self._to_docTermTable(ds_auth)
+            dtm.change_vocabulary(new_vocabulary=self._vocab)
             self._AuthorModel[auth] = dtm
             print("\t\tfound {} documents and {} relevant tokens."\
             .format(len(self._AuthorModel[auth]._smp_ids),
                 self._AuthorModel[auth]._counts.sum()))    
     
 
-    def to_docTermTable(self, df):
+    def _to_docTermTable(self, df):
         """Convert raw input X into a FreqTable object. 
 
         Override this fucntion to process other input format. 
@@ -571,7 +570,8 @@ class AuthorshipAttributionMultiDTM(AuthorshipAttributionMulti) :
         """
         
         def df_to_FreqTable(df) :
-            df = pd.DataFrame(df.groupby(['doc_id']).term.value_counts()).\
+            df = pd.DataFrame(df.groupby(['doc_id']).\
+                term.value_counts()).\
                 rename(columns={'term' : 'n'}).\
                 reset_index().\
                 pivot_table(index = 'doc_id', columns='term', values='n', fill_value=0)

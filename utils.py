@@ -38,11 +38,8 @@ def change_vocab(dtm, old_vocab, new_vocab):
     return new_dtm
 
 
-def n_most_frequenct_words_balanced(
-            df,
-            n, 
-            ngram_range = (1,1),
-            words_to_ignore = []
+def n_most_frequenct_words_balanced(df, n, 
+            ngram_range = (1,1), words_to_ignore = []
             ) :
     """
         Returns n of the most frequent tokens by each author 

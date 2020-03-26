@@ -4,6 +4,7 @@ import pandas as pd
 import warnings
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import scipy
+from TwoSampleHC import hc_vals_full
 
 LIST_OF_COLORS = ['tab:red', 'tab:blue','tab:gray', "#00BA38", 
     'tab:olive', "#619CFF", 'tab:orange', "#F8766D",

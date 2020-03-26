@@ -99,8 +99,8 @@ class AuthorshipAttributionMulti(object):
 
 
         return FreqTable(dtm,
-                    feature_names=self._vocab,
-                    sample_ids=document_names,
+                    column_names=self._vocab,
+                    row_names=document_names,
                     stbl=self._stbl,
                     randomize=self._randomize,
                     alpha=self._alpha
@@ -153,13 +153,12 @@ class AuthorshipAttributionMulti(object):
         for i, auth in enumerate(self._AuthorModel):
             am = self._AuthorModel[auth]
             
-            if method == 'HC' or method == 'HC_rank':
-                HC, rank, feat = am.get_HC_rank_features(Xdtb, LOO=LOO)
+            if method == 'HC' :
+                HC = am.get_HC(Xdtb)
                 score = HC
-                if method == 'HC' :
-                    score = HC
-                else :
-                    score = rank
+            elif method == 'HC_rank' :
+                rank = am.get_rank(Xdtb, LOO=LOO)
+                score = rank
             elif method == 'cosine':
                 cosine = am.get_CosineSim(Xdtb)
                 score = cosine
@@ -203,7 +202,8 @@ class AuthorshipAttributionMulti(object):
             for auth1 in self._AuthorModel:  # go over all corpora
                 if auth0 < auth1:       # test each pair only once
                     md1 = self._AuthorModel[auth1]
-                    HC, rank, feat = md0.get_HC_rank_features(md1)
+                    HC = md0.get_HC(md1)
+                    rank = md0.get_rank(md1)
                     chisq, chisq_pval = md0.get_ChiSquare(md1)
                     cosine = md0.get_CosineSim(md1)
                     df = df.append(
@@ -215,10 +215,9 @@ class AuthorshipAttributionMulti(object):
                             'chisq': chisq,
                             'chisq_pval' : chisq_pval,
                             'cosine': cosine,
-                            'no_docs (author)': len(md1.get_sample_ids()),
-                            'no_docs (wrt_author)': len(md0.get_sample_ids()),
+                            'no_docs (author)': len(md1.get_row_names()),
+                            'no_docs (wrt_author)': len(md0.get_row_names()),
                             'no_tokens (author)': md1._counts.sum(),
-                            'feat': list(feat)
                         },
                         ignore_index=True)
         return df
@@ -234,9 +233,9 @@ class AuthorshipAttributionMulti(object):
 
         try :
             md0 = self._AuthorModel[author]
-            lo_docs = md0.get_sample_ids()
+            lo_docs = md0.get_row_names()
             i = lo_docs[doc_id]
-            dtbl = md0.get_sample_as_table(doc_id)
+            dtbl = md0.get_row_as_table(doc_id)
         except ValueError:
             print("Document {} by author {}".format(doc_id,author)\
                 +" has empty set of features")
@@ -253,9 +252,10 @@ class AuthorshipAttributionMulti(object):
             md1 = self._AuthorModel[auth1]
                 
             if author == auth1:
-                HC, rank, feat = md1.get_HC_rank_features(
-                    dtbl, LOO=LOO, within=True
-                    )
+                #HC, rank, feat = md1.get_HC_rank_features(
+                   # dtbl, LOO=LOO, within=True)
+                HC = md1.get_HC(dtbl, within=True)
+                rank = md1.get_rank(dtbl, LOO=LOO, within=True)
                 chisq, chisq_pval = md1.get_ChiSquare(dtbl,
                                                  within=True)
                 CR, CR_pval = md1.get_ChiSquare(
@@ -270,7 +270,9 @@ class AuthorshipAttributionMulti(object):
 
                 cosine = md1.get_CosineSim(dtbl, within=True)
             else:
-                HC, rank, feat = md1.get_HC_rank_features(dtbl, LOO=LOO)
+                HC = md1.get_HC(dtbl)
+                rank = md1.get_rank(dtbl, LOO=LOO)
+
                 chisq, chisq_pval = md1.get_ChiSquare(dtbl)
 
                 CR, CR_pval = md1.get_ChiSquare(
@@ -294,7 +296,6 @@ class AuthorshipAttributionMulti(object):
                     'log-likelihood' : LL,
                     'cosine': cosine,
                     'HC_rank': rank,
-                    'feat': list(feat)
                 },
                 ignore_index=True)
         return df
@@ -341,7 +342,7 @@ class AuthorshipAttributionMulti(object):
             md0 = self._AuthorModel[auth0]
             #for auth1 in self._AuthorModel:
             #    md1 = self._AuthorModel[auth1]
-            lo_docs = md0.get_sample_ids()
+            lo_docs = md0.get_row_names()
             for dn in lo_docs:
                 if verbose :
                     print("testing {} by {}".format(dn,auth0))
@@ -389,7 +390,8 @@ class AuthorshipAttributionMulti(object):
         df = pd.DataFrame()
         for auth in tqdm(wrt_authors):
             md = self._AuthorModel[auth]
-            HC, rank, feat = md.get_HC_rank_features(xdtb, LOO=LOO)
+            HC = md.get_HC(xdtb)
+            rank = md.get_rank(xdtb, LOO=LOO)
             chisq, chisq_pval = md.get_ChiSquare(xdtb)
             cosine = md.get_CosineSim(xdtb)
             df = df.append(
@@ -399,7 +401,6 @@ class AuthorshipAttributionMulti(object):
                     'chisq': chisq,
                     'chisq_pval' : -chisq_pval,
                     'HC_rank': rank,
-                    'feat': feat,
                     'cosine': cosine,
                 },
                 ignore_index=True)
@@ -438,8 +439,8 @@ class AuthorshipAttributionMulti(object):
                 dtbl =  self._to_docTermTable([r[1].text])
                 chisq, chisq_pval = md0.get_ChiSquare(dtbl)
                 cosine = md0.get_CosineSim(dtbl)
-                HC, rank, feat = md0.get_HC_rank_features(dtbl,
-                                                        LOO=LOO)
+                HC = md0.get_HC(dtbl)
+                rank = md0.get_rank(dtbl, LOO=LOO)
                 df = df.append(
                     {
                         'doc_id': r[1].doc_id,
@@ -450,7 +451,6 @@ class AuthorshipAttributionMulti(object):
                         'chisq_pval' : chisq_pval,
                         'cosine': cosine,
                         'HC_rank': rank,
-                        'feat': list(feat)
                     },
                     ignore_index=True)
         return df
@@ -471,41 +471,11 @@ class AuthorshipAttributionMulti(object):
         self._vocab = new_feature_set
         self._recompute_author_models()
 
-    def test_against(self, x, wrt_authors = []) :
-        """ 
-        two sample test of x vs the corpora in the list 
-        wrt_authors.
-        
-        Args:
-            x -- input text (list of strings)
-            wrt_authors -- subset of the authors in the model
-                with respect to which to compute HC and features.
-                If empty, evaluate with respect to all authors.
-
-        Returns:
-            data frame of counts, pvalues, and signed z scores
-        """
-
-        xdtb = self._to_docTermTable([x])
-
-        if len(wrt_authors) == 0:
-            # evaluate with resepct to all authors in the model
-            wrt_authors = self._AuthorModel
-
-        #aggregate models
-        agg_model = None
-        for auth in tqdm(wrt_authors):
-            md = self._AuthorModel[auth]
-            agg_model = md.add_table([agg_model])
-            agg_model.collapse_dtm()
-        
-        return agg_model.two_table_test(xdtb, stbl=stbl)
-
     def train_classifyer(self, classifyer) :
         def dtm_to_featureset(dtm) :
             fs = []
-            for sm_id in dtm.get_sample_ids() :
-                dtl = dtm.get_sample_as_table(sm_id)
+            for sm_id in dtm.get_row_names() :
+                dtl = dtm.get_row_as_table(sm_id)
                 fs += [dtl.get_featureset()]
             return fs
 
@@ -581,7 +551,7 @@ class AuthorshipAttributionMultiDTM(AuthorshipAttributionMulti) :
             return mat, document_names, feature_nams
 
         mat, dn, fn = df_to_FreqTable(df)
-        dtm = FreqTable(mat, feature_names=fn, sample_ids=dn,
+        dtm = FreqTable(mat, column_names=fn, row_names=dn,
                     alpha = self._alpha, stbl=self._stbl,
                     randomize=self._randomize)
         return dtm

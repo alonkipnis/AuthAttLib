@@ -4,59 +4,79 @@ from scipy.sparse import vstack, coo_matrix
 from goodness_of_fit_tests import *
 from sklearn.neighbors.base import NeighborsBase
 
-from TwoSampleHC import hc_vals, two_sample_pvals, two_sample_test_df
+from TwoSampleHC import hc_vals, binom_test_two_sided
+import TwoSampleHC
+#To do :
+# complete class MultiTable
+# make _Pvals_from_counts to use __get_counts
 
-#To do : complete class MultiTable
+def binom_var_test(smp1, smp2, max_cnt = 100) :
+    """
+    Args : 
+    smp1, smp2 : numpy arrays or lists of integer of equal legth
+    max_cnt : limit on the support of the binomial distributon
 
-# class MultiTable(object) :
-#     """
-#     model for classification of multiple frequency tables based on
-#     frequency similarity
+    Returns:
+    series with index = m and value = P-value
 
-#     Args:
-#         data -- is a list of frequency tables
-#         vocab -- is a global vocabulary 
-#         stbl -- a parameter determinining type of HC statistic.
-#         randomize -- randomized P-values or not
-#     """
-#     def __init__(self, data, vocab=[], stbl=True, randomize=False) :
-#         self._randomize=randomize
-#         self._stbl=stbl
-#         self._classifyer=None
+    Note: 
+    Current implementation assumes equals sample sizes for smp1 and smp2
+    """
+    # Binomal varaince test.   
 
-#         self.sync_tables()
+    import pandas as pd
+    from TwoSampleHC import binom_test_two_sided
+    
+    df_smp = pd.DataFrame({'n1' : smp1, 'n2' : smp2})
+    df_smp.loc[:,'N'] = df_smp.agg('sum', axis = 'columns')
+    df_smp = df_smp[(df_smp.N <= max_cnt) & (df_smp.N > 0)]
+    df_hist = df_smp.groupby(['n1', 'n2']).count().reset_index()
 
-#         return None
+    df_hist.loc[:,'m'] = df_hist.n1 + df_hist.n2
 
-#     def train_classifyer(method=None) :
-#         "train classifyer"
-#         return None
+    df_hist.loc[:,'N1'] = df_hist.n1 * df_hist.N
+    df_hist.loc[:,'N2'] = df_hist.n2 * df_hist.N
 
-#     def sync_tables(self): 
-#         "Synchronize all tables to the same vocabulary"
-#         return None
+    df_hist.loc[:,'NN1'] = df_hist.N1.sum()
+    df_hist.loc[:,'NN2'] = df_hist.N2.sum()
 
-#     def predict(self, x, method='min_HC') :
-#         "attribute table x to one of the classes"
-#         return None
+    df_hist = df_hist.join(df_hist.filter(['m', 'N1', 'N2', 'N']).groupby('m').agg('sum'),
+                           on = 'm', rsuffix='_m')
 
-#     def intraclass_stats(self):
-#         """Compute similarity of each pair of classes within the model."""
-#         return None
+    df_hist.loc[:,'p'] = (df_hist['NN1'] - df_hist['N1_m'])\
+            / (df_hist['NN1'] + df_hist['NN2'] - df_hist['N1_m'] - df_hist['N2_m'])
 
-#     def interclass_stats(self, wrt_cls = []):
-#         """Compute similarity of each sample with respect to a class.
-#         (use sample_stats on each sample in the dataset)
+    df_hist.loc[:,'s'] = (df_hist.n1 - df_hist.m * df_hist.p) ** 2 * df_hist.N
+    df_hist.loc[:,'Es'] = df_hist.N_m * df_hist.m * df_hist.p * (1 - df_hist.p)
+    df_hist.loc[:,'Vs'] = 2 * df_hist.N_m *  df_hist.m * (df_hist.m) * ( df_hist.p * (1 - df_hist.p) ) ** 2
+    df_hist = df_hist.join(df_hist.groupby('m').agg('sum').s, on = 'm', rsuffix='_m')
+    df_hist.loc[:,'z'] = (df_hist.s_m - df_hist.Es) / np.sqrt(df_hist.Vs)
+    df_hist.loc[:,'pval'] = df_hist.z.apply(lambda z : scipy.stats.norm.cdf(-np.abs(z)))
 
-#         """
-#         return None
+    # handle the case m=1 seperately
+    n1 = df_hist[(df_hist.n1 == 1) & (df_hist.n2 == 0)].N.values
+    n2 = df_hist[(df_hist.n1 == 0) & (df_hist.n2 == 1)].N.values
+    if len(n1) + len(n2) >= 2 :
+        df_hist.loc[df_hist.m == 1,'pval'] = binom_test_two_sided(n1, n1 + n2 , 1/2)
 
-#     def sample_stats(self, smp_id, cls_id, wrt_cls = [], LOO = False) :
-#         """ stats wrt to all classes in list wrt_cls of 
-#             a single sample within the model. 
-#          """
-#         return None
+    return df_hist.groupby('m').pval.mean()
+     
+def two_sample_pvals(c1, c2, randomize=False) :
+    pv_bin_var = binom_var_test(c1, c2).values
+    pv_exact = TwoSampleHC.two_sample_pvals(c1, c2)
+    pv_all = np.concatenate([pv_bin_var, pv_exact])
+    return pv_all
 
+def get_row_sim_LOO(mat, sim_measure) :
+    # compute similarity of each row in matrix mat
+    # to the sum of all other rows
+    r,c = mat.shape
+    lo_scores = []
+
+    for i in range(r) :
+        cnt0 = mat[i,:]
+        cnt1 = mat.sum(0) - cnt0
+        lo_scores += [sim_measure(cnt0, cnt1)]
 
 class FreqTable(object):
     """ 
@@ -71,8 +91,8 @@ class FreqTable(object):
     Parameters:
     ---------- 
     dtm : doc-term matrix.
-    feature_names : list of names for each column of dtm.
-    sample_ids :  list of names for each row of dtm.
+    column_names : list of names for each column of dtm.
+    row_names :  list of names for each row of dtm.
     stbl : boolean) -- type of HC statistic to use 
     randomize : boolean -- randomized P-values 
     alpha  : boolean 
@@ -81,27 +101,27 @@ class FreqTable(object):
         - rank of ChiSquare in LOO
 
     """
-    def __init__(self, dtm, feature_names=[], sample_ids=[],
+    def __init__(self, dtm, column_names=[], row_names=[],
         stbl=True, alpha=0.2, randomize=False) :
         """ 
         Args
         ---------- 
         dtm : (sparse) doc-term matrix.
-        feature_names : list of names for each column of dtm.
-        sample_ids : list of names for each row of dtm.
+        column_names : list of names for each column of dtm.
+        row_names : list of names for each row of dtm.
 
         """
 
-        if sample_ids == []:
-            sample_ids = ["smp" + str(i) for i in range(dtm.shape[0])]
+        if len(row_names) == []:
+            row_names = ["smp" + str(i) for i in range(dtm.shape[0])]
         self._smp_ids = dict([
-            (s, i) for i, s, in enumerate(sample_ids[:dtm.shape[0]])
+            (s, i) for i, s, in enumerate(row_names[:dtm.shape[0]])
         ])
         self._sparse = scipy.sparse.issparse(dtm) # check if matrix is sparse
 
-        if len(feature_names) < dtm.shape[1] :
-            feature_names = np.arange(1,dtm.shape[1]+1).astype(str).tolist()
-        self._feature_names = feature_names  #: feature name (list)
+        if len(column_names) < dtm.shape[1] :
+            column_names = np.arange(1,dtm.shape[1]+1).astype(str).tolist()
+        self._column_names = column_names  #: feature name (list)
         if not self._sparse :
             self._dtm = np.matrix(dtm)  #: doc-term-table (matrix)
         else :
@@ -117,63 +137,45 @@ class FreqTable(object):
                 "Seems like all counts are zero. "\
                 +"Did you pass the wrong data format?"
             )
-
         
         self.__compute_internal_stat()
 
-
     def __compute_internal_stat(self, compute_pvals=True):
         """ summarize internal doc-term-table """
-        #import pdb; pdb.set_trace()
+        
         
         self._terms_per_doc = np.asarray(self._dtm.sum(1).ravel())\
                             .squeeze().astype(int)
         self._counts = np.asarray(self._dtm.sum(0).ravel())\
                     .squeeze().astype(int)
         
-        #keep HC score of each row w.r.t. the rest
-        #pv_list = self.__per_smp_Pvals()
         self._internal_scores = []
         for row in self._dtm:
             if self._sparse : 
                 cnt = np.squeeze(np.array(row.todense())).astype(int)
             else :
                 cnt = np.squeeze(np.array(row)).astype(int)
-            pv = self._get_Pvals(cnt, within = True)
+            pv = self._Pvals_from_counts(cnt, within = True)
             hc, p_thr = self.__compute_HC(pv)
             self._internal_scores += [hc]
 
-    def __per_smp_Pvals(self):
-        """Pvals of each row in dtm with respect to the rest"""
-
-        pv_list = []
-
-        #pvals when removing one row at a time
-        counts = self._counts
-        if self._dtm.shape[0] == 1:  # internal score is undefined
-            return []
-        for r in self._dtm:
-            if self._sparse :
-                c = np.squeeze(np.array(r.todense()))
-            else :
-                c = np.squeeze(np.array(r))
-            pv = two_sample_pvals(c, counts - c, 
-                            randomize=self._randomize)
-            pv_list += [pv]
-
-        return pv_list
-
     def __compute_HC(self, pvals) :
+
+        np.warnings.filterwarnings('ignore') # when more than one pval is 
+        # np.nan numpy show a warning. The current code supress this warning
         pv = pvals[pvals < self._pval_thresh]
+        np.warnings.filterwarnings('always')
         return hc_vals(pv, stbl=self._stbl,
              alpha=self._alpha)
 
-    def get_feature_names(self):
+    def get_column_names(self):
         "returns name of each column in table"
-        return self._feature_names
+        return self._column_names
 
     def get_featureset(self) :
-        return dict(zip(self._feature_names,
+        """Returns a dictionary with keys = column_names 
+        and values =  total count per column """
+        return dict(zip(self._column_names,
             np.squeeze(np.array(self._counts))))
 
     def get_per_sample_featureset(self) :
@@ -188,18 +190,14 @@ class FreqTable(object):
                np.array(self._dtm[self._smp_ids[smp_id], :])
                     ).tolist() 
             #get counts from a single line
-            ls += [dict(zip(self._feature_names,counts))]
+            ls += [dict(zip(self._column_names,counts))]
         return ls
 
-    def get_sample_ids(self):
+    def get_row_names(self):
         "returns id of each row in table"
         return self._smp_ids
 
-    def get_counts(self):
-        "returns cound of entry of each "
-        return self._counts
-
-    def _get_Pvals(self, counts, within=False):
+    def _Pvals_from_counts(self, counts, within=False):
         """ Returns pvals from a list counts 
 
         Args:
@@ -229,7 +227,7 @@ class FreqTable(object):
                         )
         return pv 
 
-    def _get_counts(self, dtbl, within=False) :
+    def __get_counts(self, dtbl, within=False) :
         """ Returns two list of counts, one from an 
         external table and one from 'self' while considering
          'within' parameter to reduce counts from 'self'.
@@ -245,13 +243,13 @@ class FreqTable(object):
             cnt1 -- adjusted counts of dtbl
         """
 
-        if list(dtbl._feature_names) != list(self._feature_names):
+        if list(dtbl._column_names) != list(self._column_names):
             print(
             "Features of 'dtbl' do not match current FreqTable"
             "intance. Changing dtbl accordingly."
             )
             #Warning for changing the test object
-            dtbl.change_vocabulary(self._feature_names)
+            dtbl.change_vocabulary(self._column_names)
 
         cnt0 = self._counts
         cnt1 = dtbl._counts
@@ -261,7 +259,7 @@ class FreqTable(object):
                 raise ValueError("'within == True' is invalid")
         return cnt0, cnt1
 
-    def get_Pvals(self, dtbl):
+    def get_Pvals(self, dtbl, within=False):
         """ return a list of p-values of another FreqTable with 
         respect to 'self' doc-term table.
 
@@ -269,17 +267,11 @@ class FreqTable(object):
             dtbl -- FreqTable object with respect to which to
                     compute pvals
         """
-
-        if dtbl._feature_names != self._feature_names:
-            print(
-                "Warning: features of 'dtbl' do not match object",
-                " Changing dtbl accordingly. "
-            )
-            #Warning for changing the test object
-            dtbl.change_vocabulary(self._feature_names)
-            print("Completed.")
-
-        return self._get_Pvals(dtbl.get_counts())
+        cnt0, cnt1 = self.__get_counts(dtbl, within=within)
+        pv = two_sample_pvals(cnt1, cnt0,
+                 randomize=self._randomize,
+                        )
+        return pv
 
     def two_table_test(self, dtbl,
                  within=False, stbl=None,
@@ -290,12 +282,12 @@ class FreqTable(object):
         if stbl == None :
             stbl = self._stbl
 
-        cnt0, cnt1 = self._get_counts(dtbl, within=within)
-        df = two_sample_test_df(cnt0, cnt1,
+        cnt0, cnt1 = self.__get_counts(dtbl, within=within)
+        df = TwoSampleHC.two_sample_test_df(cnt0, cnt1,
              stbl=stbl,
             randomize=self._randomize,
             alpha=self._alpha)
-        df.loc[:,'feat'] = self._feature_names
+        df.loc[:,'feat'] = self._column_names
         return df
 
     def change_vocabulary(self, new_vocabulary):
@@ -304,53 +296,74 @@ class FreqTable(object):
         """
         if self._sparse :
             new_dtm = scipy.sparse.lil_matrix(
-            np.zeros((self._dtm.shape[0], len(new_vocabulary))))
+            np.zeros((self._dtm.shape[0], len(new_vocabulary)))
+                                            )
         else : 
-            new_dtm = np.zeros((self._dtm.shape[0],
-                                 len(new_vocabulary)))
-        old_vocab = self._feature_names
+            new_dtm = matrix(np.zeros((self._dtm.shape[0],
+                                 len(new_vocabulary))))
+        old_vocab = self._column_names
 
         no_missing_words = 0
         for i, w in enumerate(new_vocabulary):
             #import pdb; pdb.set_trace()
             try:
-                new_dtm[:, i] = np.asarray(
-                    self._dtm[:, old_vocab.index(w)]
-                                        ).ravel()
-            except:  # num of words in 
-                # new vocabulary does not exists in old one.
+                new_dtm[:, i] = self._dtm[:, old_vocab.index(w)]
+                                
+            except:  # num of words in new vocabulary that 
+                     # do not exists in old one
                 no_missing_words += 1
 
         self._dtm = new_dtm
-        self._feature_names = new_vocabulary
+        self._column_names = new_vocabulary
 
         self.__compute_internal_stat()
 
-    def __per_smp_Pvals_LOO(self, dtm1):
-        pv_list = []
+    def __dtm_plus_row(self, row) :
+        # returns the a copy of the object matrix plus another row
+        # row is a matrix of size (1, no_columns)
+
+        assert(row.shape[1] == self._dtm.shape[1])
 
         if self._sparse :
-            dtm_all = vstack([dtm1, self._dtm]).tolil()
+            dtm_all = vstack([row, self._dtm]).tolil()
         else :     
-            dtm_all = np.concatenate([dtm1, self._dtm], axis = 0)
-        #current sample corresponds to the first row in dtm_all
+            dtm_all = np.concatenate([np.array(row), self._dtm], axis = 0)
+        return dtm_all
 
-        #pvals when the removing one document at a time
-        s1 = np.squeeze(np.array(dtm1.sum(0)))
-        s = self._counts + s1
-        for r in dtm_all:
-            if self._sparse :
-                c = np.squeeze(np.array(r.todense()))  #no dense
-            else :
-                c = np.squeeze(np.array(r))
-            pv = two_sample_pvals(c, s - c,
-                         randomize=self._randomize,
-                            )
-            pv_list += [pv]
+    def __per_row_similairy(self, row) :
+        # similarity of each row compared to the rest
+
+        mat = self.__dtm_plus_row(row)
+        
+        r,c = mat.shape
+        lo_scores = []
+
+        for i in range(r) :
+            cnt0 = np.squeeze(mat[i,:].toarray())
+            cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
+            lo_scores += [ self.__similarity(cnt0, cnt1)]
+
+        return lo_scores
+
+    def __per_smp_Pvals_LOO(self, row) :
+        pv_list = []
+        
+        mat = self.__dtm_plus_row(row)
+        
+        def func(c1, c2) :
+            return two_sample_pvals(c1, c2, randomize=self._randomize)
+
+        r,c = mat.shape
+        pv_list = []
+
+        for i in range(r) :
+            cnt0 = np.squeeze(mat[i,:].toarray())
+            cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
+            pv_list += [func(cnt0, cnt1)]
 
         return pv_list
 
-    def get_sample_as_table(self, smp_id):
+    def get_row_as_table(self, smp_id : str) :
         """ Returns a single row in the doc-term-matrix as a new 
         FreqTable object. 
 
@@ -366,31 +379,23 @@ class FreqTable(object):
             dtm = np.atleast_2d(self._dtm[self._smp_ids[smp_id], :])
 
         new_table = FreqTable(dtm,
-                            feature_names=self._feature_names,
-                            sample_ids=[smp_id], alpha=self._alpha,
+                            column_names=self._column_names,
+                            row_names=[smp_id], alpha=self._alpha,
                             randomize=self._randomize, stbl=self._stbl)
         return new_table
 
-    def collapse_dtm(self) :
-        """ Reduce table to a single row 
-        Returns
-        -------
-        new_table : new instance of FreqTable
 
-        """
-
-        self._dtm = self._dtm.sum(0)
-
-    def copy(self) :
+    def copy(self) : 
+        # create a copy of FreqTable instance
         new_table = FreqTable(
                      self._dtm,
-                     feature_names=self._feature_names,
-                     sample_ids=list(self._smp_ids.keys()), 
+                     column_names=self._column_names,
+                     row_names=list(self._smp_ids.keys()), 
                      alpha=self._alpha, randomize=self._randomize,
                      stbl=self._stbl)
         return new_table
 
-    def add_tables(self, lo_dtbl):
+    def add_tables(self, lo_dtbl) :
         """ Returns a new FreqTable object after adding
         a second FreqTable to the current one. 
 
@@ -398,16 +403,16 @@ class FreqTable(object):
         -----------
         dtbl : Another FreqTable.
 
-        Returns
+        Returns :
         -------
         FreqTable : current instance (self)
         """
         
-        curr_feat = self._feature_names
+        curr_feat = self._column_names
 
         for dtbl in lo_dtbl :
             
-            feat1 = dtbl._feature_names
+            feat1 = dtbl._column_names
 
             if curr_feat != feat1 :
                 dtbl = dtbl.change_vocabulary(feat)
@@ -432,54 +437,125 @@ class FreqTable(object):
         """ ChiSquare score with respect to another FreqTable 
         object 'dtbl'
         """
-        cnt0, cnt1 = self._get_counts(dtbl, within=within)
+        cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         return two_sample_chi_square(cnt0, cnt1, lambda_ = lambda_)
 
     def get_CosineSim(self, dtbl, within=False):
         """ Cosine similarity with respect to another FreqTable 
         object 'dtbl'
         """
-        cnt0, cnt1 = self._get_counts(dtbl, within=within)
+        cnt0, cnt1 = self.__get_counts(dtbl, within=within)
 
         return cosine_sim(cnt0, cnt1)
 
+    def get_HC(self, dtbl, within=False):
+        """ returns the HC score of dtm1 wrt to doc-term table,
+        as well as its rank among internal scores 
+        Args:
+            stbl -- indicates type of HC statistic
+            within -- indicate whether tested table is included in current 
+                    FreqTable object. if within==True then tested _count
+                    are subtracted from FreqTable._dtm
+         """
+        cnt0, cnt1 = self.__get_counts(dtbl, within=within)
+        pvals = two_sample_pvals(cnt0, cnt1)
+        #pvals = self.get_Pvals(dtbl, within=within)
+        HC, p_thr = self.__compute_HC(pvals)
+
+        return HC
+
+    def get_rank(self, dtbl , LOO=False, within=False) :
+        """ returns the rank of the similarity of dtbl compared to each
+            row in the data-table. 
+        Args:
+            dtbl : another FreqTable 
+            LOO : Leave One Out evaluation of the rank (much slower process
+                    but more accurate; especially when number of documents
+                    is small)
+            within -- indicate whether tested table is included in current 
+                    FreqTable object. if within==True then tested _count
+                    are subtracted from FreqTable._dtm
+        Return :
+            rank of score among internal ranks
+
+        Todo: 
+            provide the option to use similarity measures other than HC
+         """
+
+        if (LOO == False) or (within == True):
+            # internal scores are always evaluated in a LOO manner,
+            # hence we used internal HC scores in these cases
+            
+            score = self.get_HC(dtbl, within=within)
+
+            lo_scores = self._internal_scores
+            if len(lo_scores) - within > 0: # at least 1 doc not including
+                                       # tested doc
+                s = np.sum(np.array(lo_scores) < score) 
+                rank = s / (len(lo_scores) - within)
+            else:
+                rank = np.nan
+            
+        elif LOO == True :
+            mat = self.__dtm_plus_row(dtbl._counts)
+
+            r,c = mat.shape
+            lo_scores = []
+            for i in range(r) :
+                cnt0 = np.squeeze(mat[i,:].toarray())
+                cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
+
+                pv = two_sample_pvals(cnt0, cnt1,
+                             randomize=self._randomize)
+                HC,_ = self.__compute_HC(pv)
+                lo_scores += [HC]
+
+            if len(lo_scores) > 1:
+                score = lo_scores[0]
+                rank = np.mean(np.array(lo_scores[:1]) < score) 
+            else:
+                rank = np.nan
+
+        return rank
+
     def get_HC_rank_features(self,
-        dtbl,           #type: FreqTable
+        dtbl ,           
         LOO=False,             
         within=False,
                         ):
         """ returns the HC score of dtm1 wrt to doc-term table,
         as well as its rank among internal scores 
         Args:
-            LOO -- Leave One Out evaluation of the rank (much slower process
+            LOO : Leave One Out evaluation of the rank (much slower process
                     but more accurate; especially when number of documents
                     is small)
-            stbl -- indicates type of HC statistic
-            within -- indicate whether tested table is included in current 
+            within : indicate whether tested table is included in current 
                     FreqTable object. if within==True then tested _count
                     are subtracted from FreqTable._dtm
          """
         
-        pvals = self._get_Pvals(dtbl.get_counts(), within=within)
+        pvals = self.get_Pvals(dtbl, within=within)
 
         HC, p_thr = self.__compute_HC(pvals)
 
         pvals[np.isnan(pvals)] = 1
-        feat = np.array(self._feature_names)[pvals < p_thr]
+        feat = np.array(self._column_names)[pvals < p_thr]
 
         if (LOO == False) or (within == True):
-            # internal pvals are always evaluated in a LOO manner
+            # internal pvals are always evaluated in a LOO manner,
+            # hence we used internal HC scores in these cases
+
             lo_hc = self._internal_scores
-            if len(lo_hc) > 0: # at least 1 doc
+            if len(lo_hc)- within > 0: # at least 1 doc not including
+                                       # tested doc
                 s = np.sum(np.array(lo_hc) < HC) 
-                #rank = s / (len(lo_hc) + 1 - within)
-                rank = s / len(lo_hc)
+                rank = s / (len(lo_hc) - within)
             else:
                 rank = np.nan
             
         elif LOO == True :
             loo_Pvals = self.__per_smp_Pvals_LOO(dtbl._dtm)[1:]
-              #remove first item (corresponding to test sample)
+              #remove first item (corresponding to tested table)
 
             lo_hc = []
             if (len(loo_Pvals)) == 0:
@@ -490,9 +566,7 @@ class FreqTable(object):
                 lo_hc += [hc]
 
             if len(lo_hc) > 0:
-                s = np.sum(np.array(lo_hc) < HC) 
-                #rank = s / (len(lo_hc) + 1 - within)
-                rank = s / len(lo_hc)
+                rank = np.mean(np.array(lo_hc) < HC) 
             else:
                 rank = np.nan
 
@@ -502,6 +576,9 @@ class FreqTable(object):
 
 class FreqTableClassifier(NeighborsBase) :
     """ nearset neighbor classifcation for frequency tables 
+        TODO: 
+         - implement SVD or LDA classifier based on one of the 
+           metrics
 
     """
 
@@ -530,7 +607,7 @@ class FreqTableClassifier(NeighborsBase) :
         self._sparse = scipy.sparse.issparse(X[0])
         
         temp_dt = {}
-        for x, cls_name in zip(X,y) :
+        for x, cls_name in zip(X, y) :
             if cls_name in temp_dt:
                 temp_dt[cls_name] += [x]
             else :

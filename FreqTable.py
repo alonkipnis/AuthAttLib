@@ -62,10 +62,10 @@ def binom_var_test(smp1, smp2, max_cnt = 100) :
     return df_hist.groupby('m').pval.mean()
      
 def two_sample_pvals(c1, c2, randomize=False) :
-    pv_bin_var = binom_var_test(c1, c2).values
+    #pv_bin_var = binom_var_test(c1, c2).values
     pv_exact = TwoSampleHC.two_sample_pvals(c1, c2)
-    pv_all = np.concatenate([pv_bin_var, pv_exact])
-    return pv_all
+    #pv_all = np.concatenate([pv_bin_var, pv_exact])
+    return pv_exact
 
 def get_row_sim_LOO(mat, sim_measure) :
     # compute similarity of each row in matrix mat
@@ -299,7 +299,7 @@ class FreqTable(object):
             np.zeros((self._dtm.shape[0], len(new_vocabulary)))
                                             )
         else : 
-            new_dtm = matrix(np.zeros((self._dtm.shape[0],
+            new_dtm = np.matrix(np.zeros((self._dtm.shape[0],
                                  len(new_vocabulary))))
         old_vocab = self._column_names
 

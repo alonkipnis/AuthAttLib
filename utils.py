@@ -143,8 +143,8 @@ def term_counts(text, vocab=[], symbols=[]):
     df = pd.concat([df, pd.DataFrame({'feature': vocab, 'n': tc})])
     return df
 
-def to_docTermCounts(lo_texts, vocab=[],
-                         max_features=500, ngram_range=(1, 1)):
+def to_docTermCounts(lo_texts, vocab=[], words_to_ignore=[],
+                    max_features=500, ngram_range=(1, 1)):
     """
    convert list of strings to a doc-term matrix
    returns term-counts matrix (sparse) and a list of feature names
@@ -172,10 +172,12 @@ def to_docTermCounts(lo_texts, vocab=[],
     if vocab == []:
         tf_vectorizer = CountVectorizer(max_features=max_features,
                                         token_pattern=pat,
+                                        stop_words=words_to_ignore,
                                         ngram_range=ngram_range)
     else:
         tf_vectorizer = CountVectorizer(vocabulary=vocab,
                                         token_pattern=pat,
+                                        stop_words=words_to_ignore,
                                         ngram_range=ngram_range)
 
     tf = tf_vectorizer.fit_transform(lo_texts)

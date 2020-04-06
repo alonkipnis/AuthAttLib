@@ -123,7 +123,7 @@ class FreqTable(object):
             column_names = np.arange(1,dtm.shape[1]+1).astype(str).tolist()
         self._column_names = column_names  #: feature name (list)
         if not self._sparse :
-            self._dtm = np.matrix(dtm)  #: doc-term-table (matrix)
+            self._dtm = np.asarray(dtm)  #: doc-term-table (matrix)
         else :
             self._dtm = dtm
         self._stbl = stbl  #: type of HC score to use 
@@ -299,8 +299,8 @@ class FreqTable(object):
             np.zeros((self._dtm.shape[0], len(new_vocabulary)))
                                             )
         else : 
-            new_dtm = np.matrix(np.zeros((self._dtm.shape[0],
-                                 len(new_vocabulary))))
+            new_dtm = np.zeros((self._dtm.shape[0],
+                                 len(new_vocabulary)))
         old_vocab = self._column_names
 
         no_missing_words = 0

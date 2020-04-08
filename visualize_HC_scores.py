@@ -4,7 +4,6 @@ import pandas as pd
 import warnings
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import scipy
-from TwoSampleHC import hc_vals_full
 
 LIST_OF_COLORS = ['tab:red', 'tab:blue','tab:gray', "#00BA38", 
     'tab:olive', "#619CFF", 'tab:orange', "#F8766D",
@@ -233,30 +232,3 @@ def plot_col(df, value, sign, wrt_authors = []) :
          theme(legend_position='top')
         )        
     return p
-
-def visualize_HCz(pvals, stbl = True, dagger = True, alpha=0.2) : 
-    df_pvals = hc_vals_full(pvals, alpha=alpha)
-
-    if stbl :
-        th = 'thresh_stbl'
-        var = 'z_stbl'
-    else :
-        th = 'thresh'
-        var = 'z'
-        
-    if dagger :
-        th = th + '_dagger'
-    
-    xint = df_pvals.u[df_pvals[th]].max()
-    ymax = df_pvals[var][~df_pvals[th]].max()
-    
-    p = (
-    ggplot(aes(x = 'u', y = var),
-           data = df_pvals) + geom_line(color = 'blue')
-     + geom_vline(
-    xintercept = xint,
-    color = 'green',
-    linetype = 'dashed'
-                ) + ylim(0,1.5*ymax) 
-    )
-    return p 

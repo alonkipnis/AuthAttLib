@@ -2,19 +2,20 @@ import numpy as np
 import scipy
 from scipy.sparse import vstack, coo_matrix
 from goodness_of_fit_tests import *
-from sklearn.neighbors.base import NeighborsBase
-
-from TwoSampleHC import hc_vals, binom_test_two_sided
-import TwoSampleHC
+from sklearn.neighbors import NearestNeighbors
+    
+from TwoSampleHC import HC, binom_test_two_sided,\
+         two_sample_pvals, two_sample_test_df
+    
 #To do :
 # complete class MultiTable
 # make _Pvals_from_counts to use __get_counts
 
-def binom_var_test(smp1, smp2, max_cnt = 100) :
+def binom_var_test(smp1, smp2, max_cnt = 50) :
     """
     Args : 
     smp1, smp2 : numpy arrays or lists of integer of equal legth
-    max_cnt : limit on the support of the binomial distributon
+    max_cnt : maximum diagonal value smp1 + smp2 to consider
 
     Returns:
     series with index = m and value = P-value
@@ -22,10 +23,9 @@ def binom_var_test(smp1, smp2, max_cnt = 100) :
     Note: 
     Current implementation assumes equals sample sizes for smp1 and smp2
     """
-    # Binomal varaince test.   
+    # Binomal varaince test.   Requires Pandas
 
     import pandas as pd
-    from TwoSampleHC import binom_test_two_sided
     
     df_smp = pd.DataFrame({'n1' : smp1, 'n2' : smp2})
     df_smp.loc[:,'N'] = df_smp.agg('sum', axis = 'columns')
@@ -40,30 +40,37 @@ def binom_var_test(smp1, smp2, max_cnt = 100) :
     df_hist.loc[:,'NN1'] = df_hist.N1.sum()
     df_hist.loc[:,'NN2'] = df_hist.N2.sum()
 
-    df_hist = df_hist.join(df_hist.filter(['m', 'N1', 'N2', 'N']).groupby('m').agg('sum'),
+    df_hist = df_hist.join(df_hist.filter(
+        ['m', 'N1', 'N2', 'N']).groupby('m').agg('sum'),
                            on = 'm', rsuffix='_m')
 
     df_hist.loc[:,'p'] = (df_hist['NN1'] - df_hist['N1_m'])\
             / (df_hist['NN1'] + df_hist['NN2'] - df_hist['N1_m'] - df_hist['N2_m'])
 
-    df_hist.loc[:,'s'] = (df_hist.n1 - df_hist.m * df_hist.p) ** 2 * df_hist.N
-    df_hist.loc[:,'Es'] = df_hist.N_m * df_hist.m * df_hist.p * (1 - df_hist.p)
-    df_hist.loc[:,'Vs'] = 2 * df_hist.N_m *  df_hist.m * (df_hist.m) * ( df_hist.p * (1 - df_hist.p) ) ** 2
-    df_hist = df_hist.join(df_hist.groupby('m').agg('sum').s, on = 'm', rsuffix='_m')
+    df_hist.loc[:,'s'] = \
+            (df_hist.n1 - df_hist.m * df_hist.p) ** 2 * df_hist.N
+    df_hist.loc[:,'Es'] = \
+            df_hist.N_m * df_hist.m * df_hist.p * (1 - df_hist.p)
+    df_hist.loc[:,'Vs'] =  2 * df_hist.N_m \
+        * df_hist.m * (df_hist.m)*(df_hist.p * (1-df_hist.p)) ** 2
+    df_hist = df_hist.join(df_hist.groupby('m').agg('sum').s,
+                         on = 'm', rsuffix='_m')
     df_hist.loc[:,'z'] = (df_hist.s_m - df_hist.Es) / np.sqrt(df_hist.Vs)
-    df_hist.loc[:,'pval'] = df_hist.z.apply(lambda z : scipy.stats.norm.cdf(-np.abs(z)))
+    df_hist.loc[:,'pval'] = \
+        df_hist.z.apply(lambda z : scipy.stats.norm.cdf(-np.abs(z)))
 
     # handle the case m=1 seperately
     n1 = df_hist[(df_hist.n1 == 1) & (df_hist.n2 == 0)].N.values
     n2 = df_hist[(df_hist.n1 == 0) & (df_hist.n2 == 1)].N.values
     if len(n1) + len(n2) >= 2 :
-        df_hist.loc[df_hist.m == 1,'pval'] = binom_test_two_sided(n1, n1 + n2 , 1/2)
+        df_hist.loc[df_hist.m == 1,'pval'] =\
+                     binom_test_two_sided(n1, n1 + n2 , 1/2)
 
     return df_hist.groupby('m').pval.mean()
      
-def two_sample_pvals(c1, c2, randomize=False) :
+def two_sample_pvals_loc(c1, c2, randomize=False) :
     #pv_bin_var = binom_var_test(c1, c2).values
-    pv_exact = TwoSampleHC.two_sample_pvals(c1, c2)
+    pv_exact = two_sample_pvals(c1, c2)
     #pv_all = np.concatenate([pv_bin_var, pv_exact])
     return pv_exact
 
@@ -160,13 +167,18 @@ class FreqTable(object):
             self._internal_scores += [hc]
 
     def __compute_HC(self, pvals) :
-
         np.warnings.filterwarnings('ignore') # when more than one pval is 
         # np.nan numpy show a warning. The current code supress this warning
         pv = pvals[pvals < self._pval_thresh]
+        pv = pv[~np.isnan(pv)]
         np.warnings.filterwarnings('always')
-        return hc_vals(pv, stbl=self._stbl,
-             alpha=self._alpha)
+        if len(pv) > 0 :
+            hc = HC(pv, stbl=self._stbl)
+            return hc.HCstar(alpha=self._alpha)
+        else :
+            return [np.nan], np.nan
+        #return hc_vals(pv, stbl=self._stbl,
+        #     alpha=self._alpha)
 
     def get_column_names(self):
         "returns name of each column in table"
@@ -218,11 +230,11 @@ class FreqTable(object):
             cnt2 = cnt0 - cnt1
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
-            pv = two_sample_pvals(cnt1, cnt2,
+            pv = two_sample_pvals_loc(cnt1, cnt2,
                      randomize=self._randomize,
                      )
         else:
-            pv = two_sample_pvals(cnt1, cnt0,
+            pv = two_sample_pvals_loc(cnt1, cnt0,
                  randomize=self._randomize,
                         )
         return pv 
@@ -268,7 +280,7 @@ class FreqTable(object):
                     compute pvals
         """
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
-        pv = two_sample_pvals(cnt1, cnt0,
+        pv = two_sample_pvals_loc(cnt1, cnt0,
                  randomize=self._randomize,
                         )
         return pv
@@ -283,7 +295,7 @@ class FreqTable(object):
             stbl = self._stbl
 
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
-        df = TwoSampleHC.two_sample_test_df(cnt0, cnt1,
+        df = two_sample_test_df(cnt0, cnt1,
              stbl=stbl,
             randomize=self._randomize,
             alpha=self._alpha)
@@ -351,7 +363,7 @@ class FreqTable(object):
         mat = self.__dtm_plus_row(row)
         
         def func(c1, c2) :
-            return two_sample_pvals(c1, c2, randomize=self._randomize)
+            return two_sample_pvals_loc(c1, c2, randomize=self._randomize)
 
         r,c = mat.shape
         pv_list = []
@@ -458,7 +470,7 @@ class FreqTable(object):
                     are subtracted from FreqTable._dtm
          """
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
-        pvals = two_sample_pvals(cnt0, cnt1)
+        pvals = two_sample_pvals_loc(cnt0, cnt1)
         #pvals = self.get_Pvals(dtbl, within=within)
         HC, p_thr = self.__compute_HC(pvals)
 
@@ -497,7 +509,10 @@ class FreqTable(object):
                 rank = np.nan
             
         elif LOO == True :
-            mat = self.__dtm_plus_row(dtbl._counts)
+            cnts = dtbl._counts
+            if len(np.shape(cnts)) < 2 :
+                cnts = np.atleast_2d(cnts)
+            mat = self.__dtm_plus_row(cnts)
 
             r,c = mat.shape
             lo_scores = []
@@ -505,7 +520,7 @@ class FreqTable(object):
                 cnt0 = np.squeeze(mat[i,:].toarray())
                 cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
 
-                pv = two_sample_pvals(cnt0, cnt1,
+                pv = two_sample_pvals_loc(cnt0, cnt1,
                              randomize=self._randomize)
                 HC,_ = self.__compute_HC(pv)
                 lo_scores += [HC]
@@ -574,7 +589,7 @@ class FreqTable(object):
 
 
 
-class FreqTableClassifier(NeighborsBase) :
+class FreqTableClassifier(NearestNeighbors) :
     """ nearset neighbor classifcation for frequency tables 
         TODO: 
          - implement SVD or LDA classifier based on one of the 

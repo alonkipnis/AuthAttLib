@@ -507,8 +507,8 @@ class FreqTable(object):
             lo_scores = self._internal_scores
             if len(lo_scores) - within > 0: # at least 1 doc not including
                                        # tested doc
-                s = np.sum(np.array(lo_scores) < score) 
-                rank = s / (len(lo_scores) - within)
+                s = np.sum(np.array(lo_scores) <= score) 
+                rank = (s - within) / len(lo_scores)
             else:
                 rank = np.nan
             

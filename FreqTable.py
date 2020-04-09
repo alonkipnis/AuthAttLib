@@ -334,6 +334,9 @@ class FreqTable(object):
         # returns the a copy of the object matrix plus another row
         # row is a matrix of size (1, no_columns)
 
+        if len(np.shape(row)) < 2 :
+            row = np.atleast_2d(row)
+
         assert(row.shape[1] == self._dtm.shape[1])
 
         if self._sparse :
@@ -363,7 +366,8 @@ class FreqTable(object):
         mat = self.__dtm_plus_row(row)
         
         def func(c1, c2) :
-            return two_sample_pvals_loc(c1, c2, randomize=self._randomize)
+            return two_sample_pvals_loc(c1, c2, 
+                            randomize=self._randomize)
 
         r,c = mat.shape
         pv_list = []
@@ -527,17 +531,16 @@ class FreqTable(object):
 
             if len(lo_scores) > 1:
                 score = lo_scores[0]
-                rank = np.mean(np.array(lo_scores[:1]) < score) 
+                rank = np.mean(np.array(lo_scores[1:]) < score) 
             else:
                 rank = np.nan
 
         return rank
 
     def get_HC_rank_features(self,
-        dtbl ,           
+        dtbl,           
         LOO=False,             
-        within=False,
-                        ):
+        within=False):
         """ returns the HC score of dtm1 wrt to doc-term table,
         as well as its rank among internal scores 
         Args:

@@ -23,7 +23,8 @@ class AuthorshipAttributionMulti(object):
                            this list.
     """
     def __init__(self, data, vocab=[], stbl=True,
-                 randomize=False, alpha=0.2, **kwargs
+                 randomize=False, alpha=0.2, verbose=True,
+                  **kwargs
                 ) :
         """
         Args:
@@ -38,7 +39,7 @@ class AuthorshipAttributionMulti(object):
             words_to_ignore -- tell tokenizer to ignore words in
                                this list
         """
-
+        self._verbose = verbose
         self._AuthorModel = {}  #:  list of FreqTable objects, one for
         #: each author.
         self._ngram_range = kwargs.get('ngram_range', (1,1))  #: ng-range used
@@ -67,14 +68,16 @@ class AuthorshipAttributionMulti(object):
         lo_authors = pd.unique(data.author)
         for auth in lo_authors:
             data_auth = data[data.author == auth]
-            print("\t Creating author-model for {} using {} features..."\
-                .format(auth, len(self._vocab)))
+            if self._verbose :
+                print("\t Creating author-model for {} using {} features..."\
+                    .format(auth, len(self._vocab)))
 
             self._AuthorModel[auth] = self._to_docTermTable(
                                 list(data_auth.text),
                                 document_names=list(data_auth.doc_id)
                                 )
-            print("\t\tfound {} documents and {} relevant tokens."\
+            if self._verbose :
+                print("\t\tfound {} documents and {} relevant tokens."\
             .format(len(data_auth),
                 self._AuthorModel[auth]._counts.sum()))
 
@@ -112,8 +115,9 @@ class AuthorshipAttributionMulti(object):
         for auth in self._AuthorModel:
             am = self._AuthorModel[auth]
             am.change_vocabulary(self._vocab)
-            print("Changing vocabulary for {}. Found {} relevant tokens."\
-                .format(auth, am._counts.sum()))
+            if self._verbose :
+                print("Changing vocabulary for {}. Found {} relevant tokens."\
+                    .format(auth, am._counts.sum()))
 
     def predict(self, x, method='HC',
                 unk_thresh=1e6, LOO=False):

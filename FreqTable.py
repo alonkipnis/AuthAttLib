@@ -354,7 +354,10 @@ class FreqTable(object):
         lo_scores = []
 
         for i in range(r) :
-            cnt0 = np.squeeze(mat[i,:].toarray())
+            if self._sparse :
+                cnt0 = np.squeeze(mat[i,:].toarray())
+            else :
+                cnt0 = np.squeeze(mat[i,:])
             cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
             lo_scores += [ self.__similarity(cnt0, cnt1)]
 
@@ -373,7 +376,10 @@ class FreqTable(object):
         pv_list = []
 
         for i in range(r) :
-            cnt0 = np.squeeze(mat[i,:].toarray())
+            if self._sparse :
+                cnt0 = np.squeeze(mat[i,:].toarray())
+            else :
+                cnt0 = np.squeeze(mat[i,:])
             cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
             pv_list += [func(cnt0, cnt1)]
 
@@ -521,7 +527,10 @@ class FreqTable(object):
             r,c = mat.shape
             lo_scores = []
             for i in range(r) :
-                cnt0 = np.squeeze(mat[i,:].toarray())
+                if self._sparse :
+                    cnt0 = np.squeeze(mat[i,:].toarray())
+                else :
+                    cnt0 = np.squeeze(mat[i,:])
                 cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
 
                 pv = two_sample_pvals_loc(cnt0, cnt1,

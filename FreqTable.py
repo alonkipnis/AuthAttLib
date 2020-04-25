@@ -105,7 +105,7 @@ class FreqTable(object):
     alpha  : boolean 
 
     To Do:
-        - rank of ChiSquare in LOO
+        - rank of every stat in LOO
 
     """
     def __init__(self, dtm, column_names=[], row_names=[],
@@ -385,7 +385,29 @@ class FreqTable(object):
 
         return pv_list
 
-    def get_row_as_table(self, smp_id : str) :
+    def __per_smp_Pvals_LOO(self, row) :
+        pv_list = []
+        
+        mat = self.__dtm_plus_row(row)
+        
+        def func(c1, c2) :
+            return two_sample_pvals_loc(c1, c2, 
+                            randomize=self._randomize)
+
+        r,c = mat.shape
+        pv_list = []
+
+        for i in range(r) :
+            if self._sparse :
+                cnt0 = np.squeeze(mat[i,:].toarray())
+            else :
+                cnt0 = np.squeeze(mat[i,:])
+            cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
+            pv_list += [func(cnt0, cnt1)]
+
+        return pv_list
+
+    def get_row_as_FreqTable(self, smp_id : str) :
         """ Returns a single row in the doc-term-matrix as a new 
         FreqTable object. 
 
@@ -418,7 +440,8 @@ class FreqTable(object):
         return new_table
 
     def add_tables(self, lo_dtbl) :
-        """ Returns a new FreqTable object after adding
+        """ 
+        Returns a new FreqTable object after adding
         a second FreqTable to the current one. 
 
         Parameters:
@@ -430,6 +453,8 @@ class FreqTable(object):
         FreqTable : current instance (self)
         """
         
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+
         curr_feat = self._column_names
 
         for dtbl in lo_dtbl :

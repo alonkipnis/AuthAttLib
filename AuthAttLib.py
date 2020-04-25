@@ -239,7 +239,7 @@ class AuthorshipAttributionMulti(object):
             md0 = self._AuthorModel[author]
             lo_docs = md0.get_row_names()
             i = lo_docs[doc_id]
-            dtbl = md0.get_row_as_table(doc_id)
+            dtbl = md0.get_row_as_FreqTable(doc_id)
         except ValueError:
             print("Document {} by author {}".format(doc_id,author)\
                 +" has empty set of features")
@@ -479,7 +479,7 @@ class AuthorshipAttributionMulti(object):
         def dtm_to_featureset(dtm) :
             fs = []
             for sm_id in dtm.get_row_names() :
-                dtl = dtm.get_row_as_table(sm_id)
+                dtl = dtm.get_row_as_FreqTable(sm_id)
                 fs += [dtl.get_featureset()]
             return fs
 
@@ -519,14 +519,16 @@ class AuthorshipAttributionMultiDTM(AuthorshipAttributionMulti) :
         lo_authors = pd.unique(ds.author)
         for auth in lo_authors:
             ds_auth = ds[ds.author == auth]
-            print("\t Creating author-model for {}...".format(auth))
+            if self._verbose :
+                print("\t Creating author-model for {}...".format(auth))
             
             dtm = self._to_docTermTable(ds_auth)
             dtm.change_vocabulary(new_vocabulary=self._vocab)
             self._AuthorModel[auth] = dtm
-            print("\t\tfound {} documents and {} relevant tokens."\
-            .format(len(self._AuthorModel[auth]._smp_ids),
-                self._AuthorModel[auth]._counts.sum()))    
+            if self._verbose :
+                print("\t\tfound {} documents and {} relevant tokens."\
+                .format(len(self._AuthorModel[auth]._smp_ids),
+                    self._AuthorModel[auth]._counts.sum()))    
     
 
     def _to_docTermTable(self, df):
@@ -559,7 +561,6 @@ class AuthorshipAttributionMultiDTM(AuthorshipAttributionMulti) :
                     alpha = self._alpha, stbl=self._stbl,
                     randomize=self._randomize)
         return dtm
-
 
 
 class AuthorshipAttributionMultiBinary(object):

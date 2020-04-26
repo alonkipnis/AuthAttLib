@@ -451,7 +451,7 @@ class FreqTable(object):
         if self._sparse :
             dtm = self._dtm[self._row_labels[smp_id], :]
         else :
-            dtm = np.atleast_2d(self._dtm[self._smp_ids[smp_id], :])
+            dtm = np.atleast_2d(self._dtm[self._row_labels[smp_id], :])
 
         new_table = FreqTable(dtm,
                             column_labels=self._column_labels,

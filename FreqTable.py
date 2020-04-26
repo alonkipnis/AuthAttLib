@@ -181,7 +181,7 @@ class FreqTable(object):
         #     hc, p_thr = self.__compute_HC(pv)
         #     self._internal_scores += [hc]
         
-        self._internal_scores = self.__per_row_similarity_LOO(
+        self._internal_scores = self._per_row_similarity_LOO(
             self.row_similarity)
     
 
@@ -372,7 +372,7 @@ class FreqTable(object):
             dtm_all = np.concatenate([np.array(row), self._dtm], axis = 0)
         return dtm_all
 
-    def __per_row_similarity_LOO(self, sim_measure, new_row = [],
+    def _per_row_similarity_LOO(self, sim_measure, new_row = [],
                                                  within=False) :
         """
         Similarity of each row against all others. 
@@ -512,12 +512,25 @@ class FreqTable(object):
         return self
 
 
-    def get_ChiSquare(self, dtbl, within=False, lambda_ = None):
+    def get_ChiSquare(self, dtbl, within=False,
+        lambda_ = None, LOO_rank=False):
         """ ChiSquare score with respect to another FreqTable 
         object 'dtbl'
         """
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
-        return two_sample_chi_square(cnt0, cnt1, lambda_ = lambda_)
+        score, pval = two_sample_chi_square(cnt0, cnt1, lambda_ = lambda_)
+
+        def sim_measure(c1, c2) : 
+            return two_sample_chi_square(c1, c2, lambda_ = lambda_)[0]
+
+        rank = np.nan
+        if LOO_rank == True :
+            rank = self.get_rank(dtbl, sim_measure=sim_measure,
+                within=within, LOO=True)
+
+        return score, pval, rank
+        
+
 
     def get_CosineSim(self, dtbl, within=False):
         """ Cosine similarity with respect to another FreqTable 
@@ -562,15 +575,18 @@ class FreqTable(object):
          """
         if sim_measure == None :
             sim_measure = self.row_similarity
+        else : 
+            LOO = True # because internal scores are only meaningful
+                       # under the default similarity measure
 
-        if LOO == False :
+        if LOO == False : # rank in stored HC scores
             lo_scores = self._internal_scores
             cnt0, cnt1 = self.__get_counts(dtbl, within=within)
             score = sim_measure(cnt0, cnt1)
             lo_scores = [score] + lo_scores
 
         elif LOO == True :
-            lo_scores = self.__per_row_similarity_LOO(sim_measure,
+            lo_scores = self._per_row_similarity_LOO(sim_measure,
                              dtbl._counts, within=within)
 
         if len(lo_scores) > 1:

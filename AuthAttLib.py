@@ -229,11 +229,8 @@ class AuthorshipAttributionMulti(object):
                         ignore_index=True)
         return df
 
-    def get_doc_stats(self,
-     doc_id,
-     author,
-     wrt_authors = [],
-     LOO = False) :
+    def get_doc_stats(self, doc_id, author,
+     wrt_authors = [], LOO = False) :
         """ stats wrt to all authors in list wrt_authors of 
             a single document within the model. 
          """
@@ -263,32 +260,37 @@ class AuthorshipAttributionMulti(object):
                    # dtbl, LOO=LOO, within=True)
                 HC = md1.get_HC(dtbl, within=True)
                 rank = md1.get_rank(dtbl, LOO=LOO, within=True)
-                chisq, chisq_pval = md1.get_ChiSquare(dtbl,
-                                                 within=True)
-                CR, CR_pval = md1.get_ChiSquare(
+                chisq, chisq_pval, chisq_rank = md1.get_ChiSquare(dtbl,
+                                                 within=True,
+                                                 LOO_rank=LOO
+                                                 )
+                CR, CR_pval, _ = md1.get_ChiSquare(
                     dtbl,
                     within=True,
                     lambda_="cressie-read")
 
-                LL, LL_pval = md1.get_ChiSquare(
+                LL, LL_pval, LL_rank = md1.get_ChiSquare(
                     dtbl,
                     within=True,
-                    lambda_="log-likelihood")                
+                    lambda_="log-likelihood",
+                    LOO_rank=LOO
+                    )
 
                 cosine = md1.get_CosineSim(dtbl, within=True)
             else:
                 HC = md1.get_HC(dtbl)
                 rank = md1.get_rank(dtbl, LOO=LOO)
 
-                chisq, chisq_pval = md1.get_ChiSquare(dtbl)
+                chisq, chisq_pval, chisq_rank = md1.get_ChiSquare(dtbl,
+                            LOO_rank=LOO)
 
-                CR, CR_pval = md1.get_ChiSquare(
+                CR, CR_pval, _ = md1.get_ChiSquare(
                     dtbl,
                     lambda_="cressie-read")
 
-                LL, LL_pval = md1.get_ChiSquare(
+                LL, LL_pval, LL_rank = md1.get_ChiSquare(
                     dtbl,
-                    lambda_="log-likelihood")
+                    lambda_="log-likelihood", LOO_rank=LOO)
                 
                 cosine = md1.get_CosineSim(dtbl)
             df = df.append(
@@ -298,9 +300,10 @@ class AuthorshipAttributionMulti(object):
                     'wrt_author': auth1,
                     'HC': HC,
                     'chisq': chisq,
-                    'chisq_pval' : chisq_pval,
+                    'chisq_rank' : chisq_rank,
                     'Cressie-Read' : CR,
                     'log-likelihood' : LL,
+                    'log-likelihood_rank' : LL_rank,
                     'cosine': cosine,
                     'HC_rank': rank,
                 },
@@ -308,7 +311,9 @@ class AuthorshipAttributionMulti(object):
         return df
 
     def internal_stats(self, authors = [], 
-            wrt_authors=[], LOO=False, verbose=False):
+            wrt_authors=[], 
+            LOO=False, 
+            verbose=False):
         """
         Compute scores of each document with respect to the corpus of
         each author. When tested against its own corpus, the document

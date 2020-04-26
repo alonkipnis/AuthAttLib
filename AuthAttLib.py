@@ -24,6 +24,7 @@ class AuthorshipAttributionMulti(object):
     """
     def __init__(self, data, vocab=[], stbl=True,
                  randomize=False, alpha=0.2, verbose=True,
+                 pval_thresh=1.1,
                   **kwargs
                 ) :
         """
@@ -39,6 +40,7 @@ class AuthorshipAttributionMulti(object):
             words_to_ignore -- tell tokenizer to ignore words in
                                this list
         """
+        self._pval_thresh = pval_thresh
         self._verbose = verbose
         self._AuthorModel = {}  #:  list of FreqTable objects, one for
         #: each author.
@@ -102,11 +104,12 @@ class AuthorshipAttributionMulti(object):
 
 
         return FreqTable(dtm,
-                    column_names=self._vocab,
-                    row_names=document_names,
+                    column_labels=self._vocab,
+                    row_labels=document_names,
                     stbl=self._stbl,
                     randomize=self._randomize,
-                    alpha=self._alpha
+                    alpha=self._alpha,
+                    pval_thresh=self._pval_thresh
                     )
 
     def _recompute_author_models(self):
@@ -219,8 +222,8 @@ class AuthorshipAttributionMulti(object):
                             'chisq': chisq,
                             'chisq_pval' : chisq_pval,
                             'cosine': cosine,
-                            'no_docs (author)': len(md1.get_row_names()),
-                            'no_docs (wrt_author)': len(md0.get_row_names()),
+                            'no_docs (author)': len(md1.get_row_labels()),
+                            'no_docs (wrt_author)': len(md0.get_row_labels()),
                             'no_tokens (author)': md1._counts.sum(),
                         },
                         ignore_index=True)
@@ -237,7 +240,7 @@ class AuthorshipAttributionMulti(object):
 
         try :
             md0 = self._AuthorModel[author]
-            lo_docs = md0.get_row_names()
+            lo_docs = md0.get_row_labels()
             i = lo_docs[doc_id]
             dtbl = md0.get_row_as_FreqTable(doc_id)
         except ValueError:
@@ -346,7 +349,7 @@ class AuthorshipAttributionMulti(object):
             md0 = self._AuthorModel[auth0]
             #for auth1 in self._AuthorModel:
             #    md1 = self._AuthorModel[auth1]
-            lo_docs = md0.get_row_names()
+            lo_docs = md0.get_row_labels()
             for dn in lo_docs:
                 if verbose :
                     print("testing {} by {}".format(dn,auth0))
@@ -478,7 +481,7 @@ class AuthorshipAttributionMulti(object):
     def train_classifyer(self, classifyer) :
         def dtm_to_featureset(dtm) :
             fs = []
-            for sm_id in dtm.get_row_names() :
+            for sm_id in dtm.get_row_labels() :
                 dtl = dtm.get_row_as_FreqTable(sm_id)
                 fs += [dtl.get_featureset()]
             return fs
@@ -557,9 +560,11 @@ class AuthorshipAttributionMultiDTM(AuthorshipAttributionMulti) :
             return mat, document_names, feature_nams
 
         mat, dn, fn = df_to_FreqTable(df)
-        dtm = FreqTable(mat, column_names=fn, row_names=dn,
+        dtm = FreqTable(mat, column_labels=fn, row_labels=dn,
                     alpha = self._alpha, stbl=self._stbl,
-                    randomize=self._randomize)
+                    randomize=self._randomize,
+                    pval_thresh=self._pval_thresh
+                    )
         return dtm
 
 

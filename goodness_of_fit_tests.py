@@ -1,6 +1,32 @@
 from scipy.stats import chi2_contingency, ks_2samp, norm
 from scipy.spatial.distance import cosine
+from TwoSampleHC import two_sample_pvals, HC
 import numpy as np
+
+def HC_sim(c1, c2, alpha=0.15, randomize=False, pval_thresh=1.1) : 
+    """
+    Higher-Criticism (HC) similarity of two discrete samples
+
+    Args:
+    -----
+    c1, c2 : two lists of integers of equal length
+    alpha : HC parameter
+    randomize : randomized Pvalues or normalization
+    pval_thresh : only use P-values below this value. Has not effect
+                  if pval_thresh > 1. 
+
+    Returns:
+    -------
+    HCstar of the binomial allocation P-values of the two lists
+    """
+    pvals = two_sample_pvals(c1, c2, randomize=randomize)
+    pvals_red = pvals[pvals < pval_thresh]
+    
+    if len(pvals_red) == 0 :
+        return np.nan
+
+    hc, _ = HC(pvals_red).HCstar(alpha=alpha)
+    return hc
 
 def two_sample_chi_square(c1, c2, lambda_="pearson"):
     """returns the Chi-Square score of the two samples c1 and c2
@@ -63,12 +89,10 @@ def cosine_sim(c1, c2):
     """
     return cosine(c1, c2)
 
-
 def z_test(n1, n2, T1, T2):
     p = (n1 + n2) / (T1 + T2)  #pooled prob of success
     se = np.sqrt(p * (1 - p) * (1. / T1 + 1. / T2))
     return (n1 / T1 - n2 / T2) / se
-
 
 def two_sample_proportion(c1, c2) :
     T1 = c1.sum()

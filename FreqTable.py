@@ -74,16 +74,26 @@ def two_sample_pvals_loc(c1, c2, randomize=False) :
     #pv_all = np.concatenate([pv_bin_var, pv_exact])
     return pv_exact
 
-def get_row_sim_LOO(mat, sim_measure) :
-    # compute similarity of each row in matrix mat
-    # to the sum of all other rows
-    r,c = mat.shape
-    lo_scores = []
+def get_mat_sum(mat) :
+    """
+    mat can be 2D numpy array or a scipy matrix
+    """
+    if scipy.sparse.issparse(mat) :
+        return np.squeeze(np.array(mat.sum(0)))
+    else :
+        return np.squeeze(mat.sum(0))
 
-    for i in range(r) :
-        cnt0 = mat[i,:]
-        cnt1 = mat.sum(0) - cnt0
-        lo_scores += [sim_measure(cnt0, cnt1)]
+    return np.squeeze(np.array(mat.sum(0))).astype(int)
+
+def get_mat_row(mat, r) :
+    """
+    mat can be 2D numpy array or a scipy matrix
+    """
+    if scipy.sparse.issparse(mat) :
+        return np.squeeze(mat[r,:].toarray()).astype(int)
+    else :
+        return mat[r,:]
+
 
 class FreqTable(object):
     """ 
@@ -98,8 +108,8 @@ class FreqTable(object):
     Parameters:
     ---------- 
     dtm : doc-term matrix.
-    column_names : list of names for each column of dtm.
-    row_names :  list of names for each row of dtm.
+    column_labels : list of names for each column of dtm.
+    row_labels :  list of names for each row of dtm.
     stbl : boolean) -- type of HC statistic to use 
     randomize : boolean -- randomized P-values 
     alpha  : boolean 
@@ -108,27 +118,27 @@ class FreqTable(object):
         - rank of every stat in LOO
 
     """
-    def __init__(self, dtm, column_names=[], row_names=[],
-        stbl=True, alpha=0.2, randomize=False) :
+    def __init__(self, dtm, column_labels=[], row_labels=[],
+        stbl=True, alpha=0.2, randomize=False, pval_thresh=1.1) :
         """ 
         Args
-        ---------- 
+        ----
         dtm : (sparse) doc-term matrix.
-        column_names : list of names for each column of dtm.
-        row_names : list of names for each row of dtm.
+        column_labels : list of names for each column of dtm.
+        row_labels : list of names for each row of dtm.
 
         """
 
-        if len(row_names) == []:
-            row_names = ["smp" + str(i) for i in range(dtm.shape[0])]
-        self._smp_ids = dict([
-            (s, i) for i, s, in enumerate(row_names[:dtm.shape[0]])
+        if len(row_labels) == []:
+            row_labels = ["smp" + str(i) for i in range(dtm.shape[0])]
+        self._row_labels = dict([
+            (s, i) for i, s, in enumerate(row_labels[:dtm.shape[0]])
         ])
         self._sparse = scipy.sparse.issparse(dtm) # check if matrix is sparse
 
-        if len(column_names) < dtm.shape[1] :
-            column_names = np.arange(1,dtm.shape[1]+1).astype(str).tolist()
-        self._column_names = column_names  #: feature name (list)
+        if len(column_labels) < dtm.shape[1] :
+            column_labels = np.arange(1,dtm.shape[1]+1).astype(str).tolist()
+        self._column_labels = column_labels  #: feature name (list)
         if not self._sparse :
             self._dtm = np.asarray(dtm)  #: doc-term-table (matrix)
         else :
@@ -137,7 +147,7 @@ class FreqTable(object):
         self._randomize = randomize #: randomize P-values or not
         self._alpha = alpha
         #self._alpha = alpha # alpha parameter for HC statistic
-        self._pval_thresh = 1 #only consider P-values smaller than this
+        self._pval_thresh = pval_thresh #only consider P-values smaller than this
 
         if dtm.sum() == 0:
             raise ValueError(
@@ -147,9 +157,13 @@ class FreqTable(object):
         
         self.__compute_internal_stat()
 
+    def row_similarity(self, c1, c2) :
+        hc = HC_sim(c1, c2, alpha=self._alpha, 
+                randomize=self._randomize, pval_thresh=self._pval_thresh)
+        return hc
+
     def __compute_internal_stat(self, compute_pvals=True):
         """ summarize internal doc-term-table """
-        
         
         self._terms_per_doc = np.asarray(self._dtm.sum(1).ravel())\
                             .squeeze().astype(int)
@@ -157,14 +171,19 @@ class FreqTable(object):
                     .squeeze().astype(int)
         
         self._internal_scores = []
-        for row in self._dtm:
-            if self._sparse : 
-                cnt = np.squeeze(np.array(row.todense())).astype(int)
-            else :
-                cnt = np.squeeze(np.array(row)).astype(int)
-            pv = self._Pvals_from_counts(cnt, within = True)
-            hc, p_thr = self.__compute_HC(pv)
-            self._internal_scores += [hc]
+
+        # for row in self._dtm:
+        #     if self._sparse : 
+        #         cnt = np.squeeze(np.array(row.todense())).astype(int)
+        #     else :
+        #         cnt = np.squeeze(np.array(row)).astype(int)
+        #     pv = self._Pvals_from_counts(cnt, within = True)
+        #     hc, p_thr = self.__compute_HC(pv)
+        #     self._internal_scores += [hc]
+        
+        self._internal_scores = self.__per_row_similarity_LOO(
+            self.row_similarity)
+    
 
     def __compute_HC(self, pvals) :
         np.warnings.filterwarnings('ignore') # when more than one pval is 
@@ -180,34 +199,35 @@ class FreqTable(object):
         #return hc_vals(pv, stbl=self._stbl,
         #     alpha=self._alpha)
 
-    def get_column_names(self):
+    def get_column_labels(self):
         "returns name of each column in table"
-        return self._column_names
+        return self._column_labels
 
     def get_featureset(self) :
-        """Returns a dictionary with keys = column_names 
-        and values =  total count per column """
-        return dict(zip(self._column_names,
+        """
+        Returns a dictionary with keys = column_labels 
+        and values = total count per column """
+        return dict(zip(self._column_labels,
             np.squeeze(np.array(self._counts))))
 
     def get_per_sample_featureset(self) :
         ls = []
-        for smp_id in self._smp_ids :
+        for smp_id in self._row_labels :
             if self._sparse :
                 counts = np.squeeze(
-        np.array(self._dtm[self._smp_ids[smp_id], :].todense())
+        np.array(self._dtm[self._row_labels[smp_id], :].todense())
             ).tolist() 
             else :
                 counts = np.squeeze(
-               np.array(self._dtm[self._smp_ids[smp_id], :])
+               np.array(self._dtm[self._row_labels[smp_id], :])
                     ).tolist() 
             #get counts from a single line
-            ls += [dict(zip(self._column_names,counts))]
+            ls += [dict(zip(self._column_labels,counts))]
         return ls
 
-    def get_row_names(self):
+    def get_row_labels(self):
         "returns id of each row in table"
-        return self._smp_ids
+        return self._row_labels
 
     def _Pvals_from_counts(self, counts, within=False):
         """ Returns pvals from a list counts 
@@ -241,8 +261,8 @@ class FreqTable(object):
 
     def __get_counts(self, dtbl, within=False) :
         """ Returns two list of counts, one from an 
-        external table and one from 'self' while considering
-         'within' parameter to reduce counts from 'self'.
+        external table and one from class instance while considering
+         'within' parameter to reduce counts from class instance
 
         Args: 
             dtbl -- FreqTable representing another frequency 
@@ -255,13 +275,13 @@ class FreqTable(object):
             cnt1 -- adjusted counts of dtbl
         """
 
-        if list(dtbl._column_names) != list(self._column_names):
+        if list(dtbl._column_labels) != list(self._column_labels):
             print(
             "Features of 'dtbl' do not match current FreqTable"
             "intance. Changing dtbl accordingly."
             )
             #Warning for changing the test object
-            dtbl.change_vocabulary(self._column_names)
+            dtbl.change_vocabulary(self._column_labels)
 
         cnt0 = self._counts
         cnt1 = dtbl._counts
@@ -272,12 +292,12 @@ class FreqTable(object):
         return cnt0, cnt1
 
     def get_Pvals(self, dtbl, within=False):
-        """ return a list of p-values of another FreqTable with 
-        respect to 'self' doc-term table.
+        """ return a list of binomial allocation 
+            p-values of another FreqTable 'dtbl' with 
+            respect to doc-term table of class instance.
 
         Args: 
-            dtbl -- FreqTable object with respect to which to
-                    compute pvals
+            dtbl -- FreqTable object 
         """
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         pv = two_sample_pvals_loc(cnt1, cnt0,
@@ -299,7 +319,7 @@ class FreqTable(object):
              stbl=stbl,
             randomize=self._randomize,
             alpha=self._alpha)
-        df.loc[:,'feat'] = self._column_names
+        df.loc[:,'feat'] = self._column_labels
         return df
 
     def change_vocabulary(self, new_vocabulary):
@@ -313,7 +333,7 @@ class FreqTable(object):
         else : 
             new_dtm = np.zeros((self._dtm.shape[0],
                                  len(new_vocabulary)))
-        old_vocab = self._column_names
+        old_vocab = self._column_labels
 
         no_missing_words = 0
         for i, w in enumerate(new_vocabulary):
@@ -326,13 +346,20 @@ class FreqTable(object):
                 no_missing_words += 1
 
         self._dtm = new_dtm
-        self._column_names = new_vocabulary
+        self._column_labels = new_vocabulary
 
         self.__compute_internal_stat()
 
     def __dtm_plus_row(self, row) :
-        # returns the a copy of the object matrix plus another row
-        # row is a matrix of size (1, no_columns)
+        """
+        Args: 
+        -----
+        row : matrix of size (1, no_columns)
+
+        Returns: 
+        -------
+        copy of the object matrix plus another row
+        """
 
         if len(np.shape(row)) < 2 :
             row = np.atleast_2d(row)
@@ -345,45 +372,49 @@ class FreqTable(object):
             dtm_all = np.concatenate([np.array(row), self._dtm], axis = 0)
         return dtm_all
 
-    def __per_row_similairy(self, row) :
-        # similarity of each row compared to the rest
+    def __per_row_similarity_LOO(self, sim_measure, new_row = [],
+                                                 within=False) :
+        """
+        Similarity of each row against all others. 
 
-        mat = self.__dtm_plus_row(row)
-        
-        r,c = mat.shape
+        Args:
+        -------
+        new_row : is a (optional) new row (array of size (1,# of columns))
+        sim_measure(c1 : [int], c2 : [int]) -> float
+        within : indicates weather 'new_row' is already a 
+                 row in the table
+        """
+
         lo_scores = []
 
+        if (within == False) and (len(new_row) > 0) :
+            mat = self.__dtm_plus_row(new_row)
+        elif len(new_row) > 0 :
+            mat = self._dtm
+            # similarity of new_row
+            
+            cnt0 = np.squeeze(new_row)
+            cnt1 = get_mat_sum(mat) - cnt0
+            if np.any(cnt1 < 0):
+                raise ValueError("'within == True' is invalid")
+
+            lo_scores += [sim_measure(cnt0, cnt1)]
+        else :
+            mat = self._dtm
+
+        r, _ = mat.shape
+
+        cnt_total = get_mat_sum(mat) 
+        
         for i in range(r) :
-            if self._sparse :
-                cnt0 = np.squeeze(mat[i,:].toarray())
-            else :
-                cnt0 = np.squeeze(mat[i,:])
-            cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
-            lo_scores += [ self.__similarity(cnt0, cnt1)]
+            cnt0 = get_mat_row(mat, i)
+            cnt1 = cnt_total - cnt0
+                
+            #import pdb; pdb.set_trace()
+            lo_scores += [sim_measure(cnt0, cnt1)]
 
         return lo_scores
-
-    def __per_smp_Pvals_LOO(self, row) :
-        pv_list = []
-        
-        mat = self.__dtm_plus_row(row)
-        
-        def func(c1, c2) :
-            return two_sample_pvals_loc(c1, c2, 
-                            randomize=self._randomize)
-
-        r,c = mat.shape
-        pv_list = []
-
-        for i in range(r) :
-            if self._sparse :
-                cnt0 = np.squeeze(mat[i,:].toarray())
-            else :
-                cnt0 = np.squeeze(mat[i,:])
-            cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
-            pv_list += [func(cnt0, cnt1)]
-
-        return pv_list
+    
 
     def __per_smp_Pvals_LOO(self, row) :
         pv_list = []
@@ -418,13 +449,13 @@ class FreqTable(object):
             FreqTable object
         """
         if self._sparse :
-            dtm = self._dtm[self._smp_ids[smp_id], :]
+            dtm = self._dtm[self._row_labels[smp_id], :]
         else :
             dtm = np.atleast_2d(self._dtm[self._smp_ids[smp_id], :])
 
         new_table = FreqTable(dtm,
-                            column_names=self._column_names,
-                            row_names=[smp_id], alpha=self._alpha,
+                            column_labels=self._column_labels,
+                            row_labels=[smp_id], alpha=self._alpha,
                             randomize=self._randomize, stbl=self._stbl)
         return new_table
 
@@ -433,8 +464,8 @@ class FreqTable(object):
         # create a copy of FreqTable instance
         new_table = FreqTable(
                      self._dtm,
-                     column_names=self._column_names,
-                     row_names=list(self._smp_ids.keys()), 
+                     column_labels=self._column_labels,
+                     row_labels=list(self._row_labels.keys()), 
                      alpha=self._alpha, randomize=self._randomize,
                      stbl=self._stbl)
         return new_table
@@ -453,13 +484,14 @@ class FreqTable(object):
         FreqTable : current instance (self)
         """
         
-        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        warnings.warn("FreqTable::add_table is deprecated",
+                     DeprecationWarning, stacklevel=2)
 
-        curr_feat = self._column_names
+        curr_feat = self._column_labels
 
         for dtbl in lo_dtbl :
             
-            feat1 = dtbl._column_names
+            feat1 = dtbl._column_labels
 
             if curr_feat != feat1 :
                 dtbl = dtbl.change_vocabulary(feat)
@@ -474,7 +506,7 @@ class FreqTable(object):
                 dtm_tall = np.concatenate([self._dtm, dtbl._dtm], axis=0)
 
             self._dtm=dtm_tall
-            self._smp_ids.update(dtbl._smp_ids)
+            self._row_labels.update(dtbl._row_labels)
 
         self.__compute_internal_stat() 
         return self
@@ -511,7 +543,7 @@ class FreqTable(object):
 
         return HC
 
-    def get_rank(self, dtbl , LOO=False, within=False) :
+    def get_rank(self, dtbl, sim_measure=None, within=False, LOO=True) :
         """ returns the rank of the similarity of dtbl compared to each
             row in the data-table. 
         Args:
@@ -528,48 +560,70 @@ class FreqTable(object):
         Todo: 
             provide the option to use similarity measures other than HC
          """
+        if sim_measure == None :
+            sim_measure = self.row_similarity
 
-        if (LOO == False) or (within == True):
-            # internal scores are always evaluated in a LOO manner,
-            # hence we used internal HC scores in these cases
-            
-            score = self.get_HC(dtbl, within=within)
-
+        if LOO == False :
             lo_scores = self._internal_scores
-            if len(lo_scores) - within > 0: # at least 1 doc not including
-                                       # tested doc
-                s = np.sum(np.array(lo_scores) <= score) 
-                rank = (s - within) / len(lo_scores)
-            else:
-                rank = np.nan
-            
+            cnt0, cnt1 = self.__get_counts(dtbl, within=within)
+            score = sim_measure(cnt0, cnt1)
+            lo_scores = [score] + lo_scores
+
         elif LOO == True :
-            cnts = dtbl._counts
-            if len(np.shape(cnts)) < 2 :
-                cnts = np.atleast_2d(cnts)
-            mat = self.__dtm_plus_row(cnts)
+            lo_scores = self.__per_row_similarity_LOO(sim_measure,
+                             dtbl._counts, within=within)
 
-            r,c = mat.shape
-            lo_scores = []
-            for i in range(r) :
-                if self._sparse :
-                    cnt0 = np.squeeze(mat[i,:].toarray())
-                else :
-                    cnt0 = np.squeeze(mat[i,:])
-                cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
-
-                pv = two_sample_pvals_loc(cnt0, cnt1,
-                             randomize=self._randomize)
-                HC,_ = self.__compute_HC(pv)
-                lo_scores += [HC]
-
-            if len(lo_scores) > 1:
-                score = lo_scores[0]
-                rank = np.mean(np.array(lo_scores[1:]) < score) 
-            else:
-                rank = np.nan
-
+        if len(lo_scores) > 1:
+            score = lo_scores[0]
+            rank = np.mean(np.array(lo_scores[1:]) < score) 
+        else:
+            rank = np.nan
+        
         return rank
+
+
+    # def get_rank(self, dtbl , LOO=False, within=False) :
+    #     if (LOO == False) or (within == True):
+    #         # internal scores are always evaluated in a LOO manner,
+    #         # hence we used internal HC scores in these cases
+            
+    #         score = self.get_HC(dtbl, within=within)
+
+    #         lo_scores = self._internal_scores
+    #         if len(lo_scores) - within > 0: # at least 1 doc not including
+    #                                    # tested doc
+    #             s = np.sum(np.array(lo_scores) < score) 
+    #             rank = s / len(lo_scores)
+    #         else:
+    #             rank = np.nan
+            
+    #     elif LOO == True :
+    #         cnts = dtbl._counts
+    #         if len(np.shape(cnts)) < 2 :
+    #             cnts = np.atleast_2d(cnts)
+    #         mat = self.__dtm_plus_row(cnts)
+
+    #         r,c = mat.shape
+    #         lo_scores = []
+    #         for i in range(r) :
+    #             if self._sparse :
+    #                 cnt0 = np.squeeze(mat[i,:].toarray())
+    #             else :
+    #                 cnt0 = np.squeeze(mat[i,:])
+    #             cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
+
+    #             pv = two_sample_pvals_loc(cnt0, cnt1,
+    #                          randomize=self._randomize)
+    #             HC,_ = self.__compute_HC(pv)
+    #             lo_scores += [HC]
+
+    #         if len(lo_scores) > 1:
+    #             score = lo_scores[0]
+    #             rank = np.mean(np.array(lo_scores[1:]) < score) 
+    #         else:
+    #             rank = np.nan
+
+    #     return rank
 
     def get_HC_rank_features(self,
         dtbl,           
@@ -591,7 +645,7 @@ class FreqTable(object):
         HC, p_thr = self.__compute_HC(pvals)
 
         pvals[np.isnan(pvals)] = 1
-        feat = np.array(self._column_names)[pvals < p_thr]
+        feat = np.array(self._column_labels)[pvals < p_thr]
 
         if (LOO == False) or (within == True):
             # internal pvals are always evaluated in a LOO manner,

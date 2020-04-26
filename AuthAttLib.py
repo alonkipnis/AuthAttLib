@@ -535,7 +535,7 @@ class AuthorshipAttributionMultiDTM(AuthorshipAttributionMulti) :
             self._AuthorModel[auth] = dtm
             if self._verbose :
                 print("\t\tfound {} documents and {} relevant tokens."\
-                .format(len(self._AuthorModel[auth]._smp_ids),
+                .format(len(self._AuthorModel[auth].get_row_labels()),
                     self._AuthorModel[auth]._counts.sum()))    
     
 

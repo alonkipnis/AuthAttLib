@@ -467,10 +467,36 @@ class AuthorshipAttributionMulti(object):
                     ignore_index=True)
         return df
 
-    def two_author_test(self, auth1, auth2, stbl=None,
-                within=False, randomize=False) :
+    def two_author_test(self, auth1, auth2, 
+        stbl=None, within=False, randomize=False) :
         return self._AuthorModel[auth1]\
                   .two_table_test(self._AuthorModel[auth2],
+                   stbl=stbl,
+                   within=within,
+                   randomize=randomize
+                   )
+
+    def two_doc_test(self, auth_doc_pair1, auth_doc_pair2 , 
+        stbl=None, randomize=False) :
+
+        if auth_doc_pair1[1] == None :
+            md1 = self._AuthorModel[auth_doc_pair1[0]]
+        else :
+            md1 = self._AuthorModel[auth_doc_pair1[0]]\
+            .get_row_as_FreqTable(auth_doc_pair1[1])
+
+        if auth_doc_pair2[1] == None :
+            md1 = self._AuthorModel[auth_doc_pair2[0]]
+        else :
+            md1 = self._AuthorModel[auth_doc_pair2[0]]\
+            .get_row_as_FreqTable(auth_doc_pair2[1])
+        
+        if auth_doc_pair1[0] == auth_doc_pair1[1] :
+            within = True
+        else :
+            within = False
+
+        return md1.two_table_test(md2,
                    stbl=stbl,
                    within=within,
                    randomize=randomize

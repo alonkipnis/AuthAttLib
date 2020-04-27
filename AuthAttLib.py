@@ -500,7 +500,7 @@ class AuthorshipAttributionMulti(object):
         classifyer.train(train_set)
 
 
-class AuthorshipAttributionMultiDTM(AuthorshipAttributionMulti) :
+class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
     """ 
     Same as AuthorshipAttributionMulti but input is a 
     pd.DataFrame of the form auth-doc-lemma

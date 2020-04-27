@@ -195,7 +195,7 @@ class FreqTable(object):
             hc = HC(pv, stbl=self._stbl)
             return hc.HCstar(alpha=self._alpha)
         else :
-            return [np.nan], np.nan
+            return np.nan, np.nan
         #return hc_vals(pv, stbl=self._stbl,
         #     alpha=self._alpha)
 

@@ -210,15 +210,13 @@ class AuthorshipAttributionMulti(object):
                 if auth0 < auth1:       # test each pair only once
                     md1 = self._AuthorModel[auth1]
                     HC = md0.get_HC(md1)
-                    rank = md0.get_rank(md1)
-                    chisq, chisq_pval = md0.get_ChiSquare(md1)
+                    chisq, chisq_pval, _ = md0.get_ChiSquare(md1)
                     cosine = md0.get_CosineSim(md1)
                     df = df.append(
                         {
                             'author': auth1,
                             'wrt_author': auth0,
                             'HC': HC,
-                            'HC_rank' : rank,
                             'chisq': chisq,
                             'chisq_pval' : chisq_pval,
                             'cosine': cosine,
@@ -477,7 +475,7 @@ class AuthorshipAttributionMulti(object):
                    )
 
     def two_doc_test(self, auth_doc_pair1, auth_doc_pair2 , 
-        stbl=None, randomize=False) :
+        stbl=None) :
 
         if auth_doc_pair1[1] == None :
             md1 = self._AuthorModel[auth_doc_pair1[0]]
@@ -486,21 +484,19 @@ class AuthorshipAttributionMulti(object):
             .get_row_as_FreqTable(auth_doc_pair1[1])
 
         if auth_doc_pair2[1] == None :
-            md1 = self._AuthorModel[auth_doc_pair2[0]]
+            md2 = self._AuthorModel[auth_doc_pair2[0]]
         else :
-            md1 = self._AuthorModel[auth_doc_pair2[0]]\
+            md2 = self._AuthorModel[auth_doc_pair2[0]]\
             .get_row_as_FreqTable(auth_doc_pair2[1])
         
-        if auth_doc_pair1[0] == auth_doc_pair1[1] :
+        if auth_doc_pair1[0] == auth_doc_pair2[0] :
             within = True
         else :
             within = False
 
         return md1.two_table_test(md2,
                    stbl=stbl,
-                   within=within,
-                   randomize=randomize
-                   )    
+                   within=within)    
 
     def reduce_features(self, new_feature_set):
         """
@@ -584,7 +580,8 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
                 term.value_counts()).\
                 rename(columns={'term' : 'n'}).\
                 reset_index().\
-                pivot_table(index = 'doc_id', columns='term', values='n', fill_value=0)
+                pivot_table(index = 'doc_id', columns='term',
+                 values='n', fill_value=0)
             feature_nams = df.columns.tolist()
             document_names = df.index.tolist()
             mat = df.to_numpy()

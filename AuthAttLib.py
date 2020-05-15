@@ -476,6 +476,20 @@ class AuthorshipAttributionMulti(object):
 
     def two_doc_test(self, auth_doc_pair1, auth_doc_pair2 , 
         stbl=None) :
+        """ Test two documents/corpora against each other.
+        If 
+
+        Args:
+        -----
+        auth_doc_pairx : tuple , first coordinate is corpus name and 
+                                 second coorindate is document name. If document
+                                 name is None, all corpus is used. 
+                                 If testing a corpus agains a dcoument of that 
+                                 corpus, pass 
+            auth_doc_pair1 = (<corpus_name>, None)
+            auth_doc_pair1 = (<corpus_name>, <doc_id>)
+
+        """
 
         if auth_doc_pair1[1] == None :
             md1 = self._AuthorModel[auth_doc_pair1[0]]
@@ -490,13 +504,14 @@ class AuthorshipAttributionMulti(object):
             .get_row_as_FreqTable(auth_doc_pair2[1])
         
         if auth_doc_pair1[0] == auth_doc_pair2[0] :
-            within = True
-        else :
-            within = False
-
+            if auth_doc_pair1[1] == None:
+                return md1.two_table_test(md2,
+                       stbl=stbl,
+                       within=True)            
+            
         return md1.two_table_test(md2,
                    stbl=stbl,
-                   within=within)    
+                   within=False)
 
     def reduce_features(self, new_feature_set):
         """

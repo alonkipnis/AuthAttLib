@@ -468,7 +468,7 @@ class AuthorshipAttributionMulti(object):
     def two_author_test(self, auth1, auth2, 
         stbl=None, within=False, randomize=False) :
         return self._AuthorModel[auth1]\
-                  .two_table_test(self._AuthorModel[auth2],
+                  .two_table_HC_test(self._AuthorModel[auth2],
                    stbl=stbl,
                    within=within,
                    randomize=randomize
@@ -505,11 +505,11 @@ class AuthorshipAttributionMulti(object):
         
         if auth_doc_pair1[0] == auth_doc_pair2[0] :
             if auth_doc_pair1[1] == None:
-                return md1.two_table_test(md2,
+                return md1.two_table_HC_test(md2,
                        stbl=stbl,
                        within=True)            
             
-        return md1.two_table_test(md2,
+        return md1.two_table_HC_test(md2,
                    stbl=stbl,
                    within=False)
 

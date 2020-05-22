@@ -265,19 +265,21 @@ class FreqTable(object):
          'within' parameter to reduce counts from class instance
 
         Args: 
+        -----
             dtbl -- FreqTable representing another frequency 
                     counts table
             within -- indicates whether counts of dtbl should be 
                     reduced from from counts of self._dtm
 
         Returns:
-            cnt0 -- adjusted counts of self
+        -------
+            cnt0 -- adjusted counts of object instance
             cnt1 -- adjusted counts of dtbl
         """
 
         if list(dtbl._column_labels) != list(self._column_labels):
             print(
-            "Features of 'dtbl' do not match current FreqTable"
+            "Features of 'dtbl' do not match FreqTable"
             "intance. Changing dtbl accordingly."
             )
             #Warning for changing the test object
@@ -305,11 +307,25 @@ class FreqTable(object):
                         )
         return pv
 
-    def two_table_test(self, dtbl,
+    def two_table_HC_test(self, dtbl,
                  within=False, stbl=None,
                  randomize=False) :
-        """counts, p-values, and HC with 
+        """
+        counts, p-values, and HC with 
         respect to another FreqTable
+
+        Args:
+        -----
+        dtbl : another FreqTable to test agains
+
+        Returns:
+        -------
+        DataFrame with columns representing counts, 
+        binomial allocation P-values, and HC score
+
+        To do: think about a better way to handle mismatch
+                when feature is a tuple
+        
         """
         if stbl == None :
             stbl = self._stbl
@@ -319,7 +335,11 @@ class FreqTable(object):
              stbl=stbl,
             randomize=self._randomize,
             alpha=self._alpha)
-        df.loc[:,'feat'] = self._column_labels
+        lbls = self._column_labels
+        try :
+            df.loc[:,'feat'] = self._column_labels
+        except :
+            df.loc[:,'feat'] = [self._column_labels]
         return df
 
     def change_vocabulary(self, new_vocabulary):
@@ -753,7 +773,7 @@ class FreqTableClassifier(NearestNeighbors) :
         """ 
         
         def sim_HC(x1, x2) :
-            r = x1.two_table_test(x2)
+            r = x1.two_table_HC_test(x2)
             return r['HC'].values[0]
 
         def chisq(x1, x2) :

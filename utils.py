@@ -1,10 +1,28 @@
 #supporting functions for AuthAttrLib
-
 import pandas as pd
 import numpy as np
 from tqdm import *
 import re
+from sklearn.feature_extraction.text import CountVectorizer
+from nltk import ngrams
 
+
+def extract_ngrams(df, ng_range = (1,1)) :
+    """
+        nest terms as ngrams 
+    """
+
+    new_df = pd.DataFrame()
+    for c in df.groupby(['author', 'doc_id']) :
+      ng_terms = []
+      for i in range(ng_range[0], ng_range[1]+1) :
+        ng_terms += ngrams(c[1].term.values.tolist(), n = i)
+      dsc = pd.DataFrame()
+      dsc.loc[:,'term'] = list(ng_terms)
+      dsc.loc[:,'author'] = c[0][0]
+      dsc.loc[:,'doc_id'] = c[0][1]
+      new_df = new_df.append(dsc, ignore_index=True)
+    return new_df
 
 def to_dtm(doc_term_counts):
     """
@@ -79,8 +97,6 @@ def n_most_frequent_words(texts, n,
         list of strings 'texts'
     """
 
-    from sklearn.feature_extraction.text import CountVectorizer
-
     pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
 
     tf_vectorizer = CountVectorizer(stop_words=words_to_ignore,
@@ -123,7 +139,6 @@ def term_counts(text, vocab=[], symbols=[]):
         counts of terms in text and symbols in text. 
         If vocab = [] use all words in text as the vocabulary.
     """
-    from sklearn.feature_extraction.text import CountVectorizer
 
     df = pd.DataFrame()
 
@@ -165,7 +180,6 @@ def to_docTermCounts(lo_texts, vocab=[], words_to_ignore=[],
                         in tf. 
     """
 
-    from sklearn.feature_extraction.text import CountVectorizer
 
     pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
 

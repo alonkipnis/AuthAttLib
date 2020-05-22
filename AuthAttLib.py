@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 from tqdm import *
-from utils import to_docTermCounts, n_most_frequent_words
+from utils import to_docTermCounts,\
+ n_most_frequent_words, extract_ngrams
 from FreqTable import FreqTable
             
 
@@ -63,7 +64,7 @@ class AuthorshipAttributionMulti(object):
               list(data.text), 
               n= kwargs.get('vocab_size', 100),
               words_to_ignore=kwargs.get('words_to_ignore', []),
-              ngram_range=kwargs.get('ngram_range', (1,1))
+              ngram_range=self._ngram_range
               )
 
     def _compute_author_models(self, data) :        
@@ -555,7 +556,9 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
         """
 
         MIN_CNT = kwargs.get('min_cnt', 3)
-        cnt = ds.term.value_counts() 
+
+        ds_ng = extract_ngrams(ds, self._ngram_range)
+        cnt = ds_ng.term.value_counts() 
         vocab = cnt[cnt >= MIN_CNT].index.tolist()
         self._vocab = vocab
 
@@ -602,6 +605,8 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
             mat = df.to_numpy()
             return mat, document_names, feature_nams
 
+
+        df = extract_ngrams(df, self._ngram_range)
         mat, dn, fn = df_to_FreqTable(df)
         dtm = FreqTable(mat, column_labels=fn, row_labels=dn,
                     alpha = self._alpha, stbl=self._stbl,

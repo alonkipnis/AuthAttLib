@@ -5,7 +5,6 @@ from utils import to_docTermCounts,\
  n_most_frequent_words, extract_ngrams
 from FreqTable import FreqTable
             
-
 class AuthorshipAttributionMulti(object):
     """
     model for text classification using word frequency data and HC-based 
@@ -556,9 +555,7 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
         """
 
         MIN_CNT = kwargs.get('min_cnt', 3)
-
-        ds_ng = extract_ngrams(ds, self._ngram_range)
-        cnt = ds_ng.term.value_counts() 
+        cnt = ds.term.value_counts() 
         vocab = cnt[cnt >= MIN_CNT].index.tolist()
         self._vocab = vocab
 
@@ -605,8 +602,7 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
             mat = df.to_numpy()
             return mat, document_names, feature_nams
 
-
-        df = extract_ngrams(df, self._ngram_range)
+        df = df[df.term.isin(self._vocab)]
         mat, dn, fn = df_to_FreqTable(df)
         dtm = FreqTable(mat, column_labels=fn, row_labels=dn,
                     alpha = self._alpha, stbl=self._stbl,

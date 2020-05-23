@@ -7,15 +7,14 @@
 - DocTermHC -- model for constructing large-sacle word-frequency table and HC testing against it. 
 - HC_aux.py -- auxiliary functions to evaluate Higher Criticism tests 
 
-In order to use AuthorshipAttributionMulti and AuthorshipAttributionMultiBinary arrange input data in a pandas dataframe with columns 
-> author, doc_id, text
-- author is the name of the class document is assoicated with.
-- doc_id is a unique document identifyer.
-- text contains the text (content) of the document. 
+To use AuthorshipAttributionMulti and AuthorshipAttributionMultiBinary, arrange your datase in a pandas dataframe with columns *author*, *doc_id*, and *text*
+- *author* is the name of the class the document is assoicated with.
+- *doc_id* is a unique document identifyer.
+- *text* is a string representing the content of the document. 
 
-See AuthorshipAttribution_example.ipynb for usage in authorship attribution challenges. 
+See AuthorshipAttribution_example.ipynb for a use case in authorship attribution challenges. Here is the Binder link: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/alonkipnis/AuthorshipAttribution/master?filepath=Examples%2FAuthorshipAttribution_example.ipynb)
 
-This code was used to get the resutls and figures reported in [this](https://web.stanford.edu/~kipnisal/authorship.html) page and in the paper:
+This code was used to get the resutls and figures reported in [this](https://web.stanford.edu/~kipnisal/authorship.html) and in the paper:
 
 Alon Kipnis, ``[Higher Criticism for Discriminating Word-Frequency Tables and Testing Authorship](https://arxiv.org/abs/1911.01208)'', 2019
 

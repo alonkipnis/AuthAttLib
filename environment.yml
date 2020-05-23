@@ -1,0 +1,7 @@
+name: authorship-env
+dependencies:
+  - python>=3.5
+  - anaconda
+  - pip
+  - pip:
+    - -r file:requirements.txt

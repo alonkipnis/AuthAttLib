@@ -4,24 +4,37 @@ import numpy as np
 from tqdm import *
 import re
 from sklearn.feature_extraction.text import CountVectorizer
-from nltk import ngrams
+from nltk import everygrams
 
-
-def extract_ngrams(df, ng_range = (1,1)) :
+def extract_ngrams(df, ng_range = (1,1), by = ['author', 'doc_id'],
+             pad_left = False) :
     """
         nest terms as ngrams 
+    Args:
+    -----
+    df : DataFrame with columns: term, author, doc_id
+    ng_range : (min_gram, max_gram) 
+    by : list containing fileds to group by
+    pad_left : whether to pad_left when extracting n-grams
     """
 
-    new_df = pd.DataFrame()
-    for c in df.groupby(['author', 'doc_id']) :
-      ng_terms = []
-      for i in range(ng_range[0], ng_range[1]+1) :
-        ng_terms += ngrams(c[1].term.values.tolist(), n = i)
-      dsc = pd.DataFrame()
-      dsc.loc[:,'term'] = list(ng_terms)
-      dsc.loc[:,'author'] = c[0][0]
-      dsc.loc[:,'doc_id'] = c[0][1]
-      new_df = new_df.append(dsc, ignore_index=True)
+
+    if pad_left :
+        new_df = df.groupby(by)\
+        .term.apply(lambda x : list(everygrams(x, min_len=ng_range[0], 
+                                              max_len=ng_range[1], 
+                                             pad_left=True,
+                                             left_pad_symbol='<start>'  
+                                             )))\
+        .explode()\
+        .reset_index()
+    else :
+        new_df = df.groupby(by)\
+        .term.apply(lambda x : list(everygrams(x, min_len=ng_range[0], 
+                                              max_len=ng_range[1]
+                                             )))\
+        .explode()\
+        .reset_index()
     return new_df
 
 def to_dtm(doc_term_counts):

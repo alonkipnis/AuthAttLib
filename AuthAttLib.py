@@ -17,7 +17,7 @@ class AuthorshipAttributionMulti(object):
         vocab -- reduce word counts for this set (unless vocab == []).
         vocab_size -- extract vocabulary of this size 
                       (only if vocab == []).
-        ngram_range -- ngram parameter for term tf_vectorizer
+        ngram_range -- ngram parameter for tf_vectorizer
         stbl -- a parameter determinining type of HC statistic.
         words_to_ignore -- tell tokenizer to ignore words in
                            this list.
@@ -35,7 +35,7 @@ class AuthorshipAttributionMulti(object):
             vocab -- reduce word counts for this set (unless vocab == [])
             vocab_size -- extract vocabulary of this size 
                           (only if vocab == [])
-            ngram_range -- ngram parameter for term tf_vectorizer
+            ngram_range -- ngram parameter for tf_vectorizer
             stbl -- a parameter determinining type of HC statistic
             words_to_ignore -- tell tokenizer to ignore words in
                                this list

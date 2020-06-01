@@ -18,7 +18,6 @@ def extract_ngrams(df, ng_range = (1,1), by = ['author', 'doc_id'],
     pad_left : whether to pad_left when extracting n-grams
     """
 
-
     if pad_left :
         new_df = df.groupby(by)\
         .term.apply(lambda x : list(everygrams(x, min_len=ng_range[0], 
@@ -172,7 +171,7 @@ def term_counts(text, vocab=[], symbols=[]):
     return df
 
 def to_docTermCounts(lo_texts, vocab=[], words_to_ignore=[],
-                    max_features=500, ngram_range=(1, 1)):
+                    vocab_size=500, ngram_range=(1, 1)):
     """
    convert list of strings to a doc-term matrix
    returns term-counts matrix (sparse) and a list of feature names
@@ -197,7 +196,7 @@ def to_docTermCounts(lo_texts, vocab=[], words_to_ignore=[],
     pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
 
     if vocab == []:
-        tf_vectorizer = CountVectorizer(max_features=max_features,
+        tf_vectorizer = CountVectorizer(max_features=vocab_size,
                                         token_pattern=pat,
                                         stop_words=words_to_ignore,
                                         ngram_range=ngram_range)

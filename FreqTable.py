@@ -551,7 +551,6 @@ class FreqTable(object):
         return score, pval, rank
         
 
-
     def get_CosineSim(self, dtbl, within=False):
         """ Cosine similarity with respect to another FreqTable 
         object 'dtbl'
@@ -618,48 +617,6 @@ class FreqTable(object):
         return rank
 
 
-    # def get_rank(self, dtbl , LOO=False, within=False) :
-    #     if (LOO == False) or (within == True):
-    #         # internal scores are always evaluated in a LOO manner,
-    #         # hence we used internal HC scores in these cases
-            
-    #         score = self.get_HC(dtbl, within=within)
-
-    #         lo_scores = self._internal_scores
-    #         if len(lo_scores) - within > 0: # at least 1 doc not including
-    #                                    # tested doc
-    #             s = np.sum(np.array(lo_scores) < score) 
-    #             rank = s / len(lo_scores)
-    #         else:
-    #             rank = np.nan
-            
-    #     elif LOO == True :
-    #         cnts = dtbl._counts
-    #         if len(np.shape(cnts)) < 2 :
-    #             cnts = np.atleast_2d(cnts)
-    #         mat = self.__dtm_plus_row(cnts)
-
-    #         r,c = mat.shape
-    #         lo_scores = []
-    #         for i in range(r) :
-    #             if self._sparse :
-    #                 cnt0 = np.squeeze(mat[i,:].toarray())
-    #             else :
-    #                 cnt0 = np.squeeze(mat[i,:])
-    #             cnt1 = np.squeeze(np.asarray(mat.sum(0))) - cnt0
-
-    #             pv = two_sample_pvals_loc(cnt0, cnt1,
-    #                          randomize=self._randomize)
-    #             HC,_ = self.__compute_HC(pv)
-    #             lo_scores += [HC]
-
-    #         if len(lo_scores) > 1:
-    #             score = lo_scores[0]
-    #             rank = np.mean(np.array(lo_scores[1:]) < score) 
-    #         else:
-    #             rank = np.nan
-
-    #     return rank
 
     def get_HC_rank_features(self,
         dtbl,           

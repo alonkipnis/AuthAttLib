@@ -3,14 +3,14 @@ from scipy.spatial.distance import cosine
 from TwoSampleHC import two_sample_pvals, HC
 import numpy as np
 
-def HC_sim(c1, c2, alpha=0.15, randomize=False, pval_thresh=1.1) : 
+def HC_sim(c1, c2, gamma=0.15, randomize=False, pval_thresh=1.1) : 
     """
     Higher-Criticism (HC) similarity of two discrete samples
 
     Args:
     -----
     c1, c2 : two lists of integers of equal length
-    alpha : HC parameter
+    gamma : HC parameter
     randomize : randomized Pvalues or normalization
     pval_thresh : only use P-values below this value. Has not effect
                   if pval_thresh > 1. 
@@ -25,7 +25,7 @@ def HC_sim(c1, c2, alpha=0.15, randomize=False, pval_thresh=1.1) :
     if len(pvals_red) == 0 :
         return np.nan
 
-    hc, _ = HC(pvals_red).HCstar(alpha=alpha)
+    hc, _ = HC(pvals_red).HCstar(gamma=gamma)
     return hc
 
 def two_sample_chi_square(c1, c2, lambda_="pearson"):

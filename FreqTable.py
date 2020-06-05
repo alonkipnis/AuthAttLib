@@ -536,6 +536,13 @@ class FreqTable(object):
         lambda_ = None, LOO_rank=False):
         """ ChiSquare score with respect to another FreqTable 
         object 'dtbl'
+
+        Returns:
+        ------- 
+        Chi-squares test score
+        pvalue of this test
+        rank of test scores among other documents
+        
         """
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         score, pval = two_sample_chi_square(cnt0, cnt1, lambda_ = lambda_)

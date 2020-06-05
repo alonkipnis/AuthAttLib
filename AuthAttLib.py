@@ -170,7 +170,7 @@ class AuthorshipAttributionMulti(object):
                 cosine = am.get_CosineSim(Xdtb)
                 score = cosine
             elif method == 'chisq' or method == 'chisq_pval' :
-                chisq, chisq_pval = am.get_ChiSquare(Xdtb)
+                chisq, chisq_pval, chisq_rank = am.get_ChiSquare(Xdtb)
                 if method == 'chisq' :
                     score = chisq
                 else :
@@ -210,7 +210,7 @@ class AuthorshipAttributionMulti(object):
                 if auth0 < auth1:       # test each pair only once
                     md1 = self._AuthorModel[auth1]
                     HC = md0.get_HC(md1)
-                    chisq, chisq_pval, _ = md0.get_ChiSquare(md1)
+                    chisq, chisq_pval, chisq_rank = md0.get_ChiSquare(md1)
                     cosine = md0.get_CosineSim(md1)
                     df = df.append(
                         {
@@ -219,6 +219,7 @@ class AuthorshipAttributionMulti(object):
                             'HC': HC,
                             'chisq': chisq,
                             'chisq_pval' : chisq_pval,
+                            'chisq_rank' : chisq_rank,
                             'cosine': cosine,
                             'no_docs (author)': len(md1.get_row_labels()),
                             'no_docs (wrt_author)': len(md0.get_row_labels()),
@@ -447,7 +448,7 @@ class AuthorshipAttributionMulti(object):
             md0 = self._AuthorModel[auth0]
             for r in data.iterrows() :
                 dtbl =  self._to_docTermTable([r[1].text])
-                chisq, chisq_pval = md0.get_ChiSquare(dtbl)
+                chisq, chisq_pval, chisq_rank = md0.get_ChiSquare(dtbl)
                 cosine = md0.get_CosineSim(dtbl)
                 HC = md0.get_HC(dtbl)
                 rank = md0.get_rank(dtbl, LOO=LOO)
@@ -458,6 +459,7 @@ class AuthorshipAttributionMulti(object):
                         'wrt_author': auth0,
                         'HC': HC,
                         'chisq': chisq,
+                        'chisq_rank' : chisq_rank,
                         'chisq_pval' : chisq_pval,
                         'cosine': cosine,
                         'HC_rank': rank,

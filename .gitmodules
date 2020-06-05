@@ -1,0 +1,3 @@
+[submodule "TwoSampleHC"]
+	path = TwoSampleHC
+	url = https://github.com/alonkipnis/TwoSampleHC.git

@@ -23,7 +23,7 @@ class AuthorshipAttributionMulti(object):
                            this list.
     """
     def __init__(self, data, vocab=[], stbl=True,
-                 randomize=False, alpha=0.2, verbose=True,
+                 randomize=False, gamma=0.2, verbose=True,
                  pval_thresh=1.1,
                   **kwargs
                 ) :
@@ -48,7 +48,7 @@ class AuthorshipAttributionMulti(object):
         #: in the model.
         self._stbl = stbl  #:  type of HC statistic to use.
         self._randomize = randomize #: randomize pvalue or not
-        self._alpha = alpha
+        self._gamma = gamma
 
         self._vocab = vocab
         if len(self._vocab) == 0 : #get vocabulary unless supplied
@@ -108,7 +108,7 @@ class AuthorshipAttributionMulti(object):
                     row_labels=document_names,
                     stbl=self._stbl,
                     randomize=self._randomize,
-                    alpha=self._alpha,
+                    gamma=self._gamma,
                     pval_thresh=self._pval_thresh
                     )
 
@@ -605,7 +605,7 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
         df = df[df.term.isin(self._vocab)]
         mat, dn, fn = df_to_FreqTable(df)
         dtm = FreqTable(mat, column_labels=fn, row_labels=dn,
-                    alpha = self._alpha, stbl=self._stbl,
+                    gamma = self._gamma, stbl=self._stbl,
                     randomize=self._randomize,
                     pval_thresh=self._pval_thresh
                     )

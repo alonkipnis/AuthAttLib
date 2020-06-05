@@ -112,14 +112,14 @@ class FreqTable(object):
     row_labels :  list of names for each row of dtm.
     stbl : boolean) -- type of HC statistic to use 
     randomize : boolean -- randomized P-values 
-    alpha  : boolean 
+    gamma  : boolean 
 
     To Do:
         - rank of every stat in LOO
 
     """
     def __init__(self, dtm, column_labels=[], row_labels=[],
-        stbl=True, alpha=0.2, randomize=False, pval_thresh=1.1) :
+        stbl=True, gamma=0.2, randomize=False, pval_thresh=1.1) :
         """ 
         Args
         ----
@@ -145,8 +145,8 @@ class FreqTable(object):
             self._dtm = dtm
         self._stbl = stbl  #: type of HC score to use 
         self._randomize = randomize #: randomize P-values or not
-        self._alpha = alpha
-        #self._alpha = alpha # alpha parameter for HC statistic
+        self._gamma = gamma
+        #self._gamma = gamma # gamma parameter for HC statistic
         self._pval_thresh = pval_thresh #only consider P-values smaller than this
 
         if dtm.sum() == 0:
@@ -158,7 +158,7 @@ class FreqTable(object):
         self.__compute_internal_stat()
 
     def row_similarity(self, c1, c2) :
-        hc = HC_sim(c1, c2, alpha=self._alpha, 
+        hc = HC_sim(c1, c2, gamma=self._gamma, 
                 randomize=self._randomize, pval_thresh=self._pval_thresh)
         return hc
 
@@ -193,11 +193,11 @@ class FreqTable(object):
         np.warnings.filterwarnings('always')
         if len(pv) > 0 :
             hc = HC(pv, stbl=self._stbl)
-            return hc.HCstar(alpha=self._alpha)
+            return hc.HCstar(gamma=self._gamma)
         else :
             return np.nan, np.nan
         #return hc_vals(pv, stbl=self._stbl,
-        #     alpha=self._alpha)
+        #     gamma=self._gamma)
 
     def get_column_labels(self):
         "returns name of each column in table"
@@ -334,7 +334,7 @@ class FreqTable(object):
         df = two_sample_test_df(cnt0, cnt1,
              stbl=stbl,
             randomize=self._randomize,
-            alpha=self._alpha)
+            gamma=self._gamma)
         lbls = self._column_labels
         try :
             df.loc[:,'feat'] = self._column_labels
@@ -475,7 +475,7 @@ class FreqTable(object):
 
         new_table = FreqTable(dtm,
                             column_labels=self._column_labels,
-                            row_labels=[smp_id], alpha=self._alpha,
+                            row_labels=[smp_id], gamma=self._gamma,
                             randomize=self._randomize, stbl=self._stbl)
         return new_table
 
@@ -486,7 +486,7 @@ class FreqTable(object):
                      self._dtm,
                      column_labels=self._column_labels,
                      row_labels=list(self._row_labels.keys()), 
-                     alpha=self._alpha, randomize=self._randomize,
+                     gamma=self._gamma, randomize=self._randomize,
                      stbl=self._stbl)
         return new_table
 

@@ -10,48 +10,6 @@ from TwoSampleHC import HC, binom_test_two_sided,\
 #To do :
 # complete class MultiTable
 
-def to_docTermCounts(lo_texts, vocab=[], words_to_ignore=[],
-                    vocab_size=500, ngram_range=(1, 1)):
-    """
-   convert list of strings to a doc-term matrix
-   returns term-counts matrix (sparse) and a list of feature names
-
-   Args:
-        lo_texts -- each item in this list represents a different
-                    document and is summarized by a row in the output
-                    matrix
-        vocab -- is the preset list of tokens to count. If empty, use...
-        max_features -- ... number of words
-        ngram_range -- is the ngram range for the vectorizer. 
-                        Note: you must provide the ngram range even if a preset
-                        vocabulary is used. This is due to the interface of
-                        sklearn.CountVectorizer.
-    Returns:
-        tf -- term-frequency matrix (in sparse format)
-        feature_names -- list of token names corresponding to rows
-                        in tf. 
-    """
-
-
-    pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
-
-    if vocab == []:
-        tf_vectorizer = CountVectorizer(max_features=vocab_size,
-                                        token_pattern=pat,
-                                        stop_words=words_to_ignore,
-                                        ngram_range=ngram_range)
-    else:
-        tf_vectorizer = CountVectorizer(vocabulary=vocab,
-                                        token_pattern=pat,
-                                        stop_words=words_to_ignore,
-                                        ngram_range=ngram_range)
-
-    tf = tf_vectorizer.fit_transform(lo_texts)
-    feature_names = tf_vectorizer.get_feature_names()
-
-    return tf, feature_names
-
-
 
 def binom_var_test(smp1, smp2, max_cnt = 50) :
     """

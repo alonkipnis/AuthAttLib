@@ -297,7 +297,7 @@ class AuthorshipAttributionMulti(object):
                     'author': author,
                     'wrt_author': auth1,
                     'HC': HC,
-                    'BJ' : bj,
+                    #'BJ' : bj,
                     'chisq': chisq,
                     'chisq_rank' : chisq_rank,
                     'Cressie-Read' : CR,

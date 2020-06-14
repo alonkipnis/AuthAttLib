@@ -7,43 +7,30 @@ from FreqTable import FreqTable
             
 class AuthorshipAttributionMulti(object):
     """
-    model for text classification using word frequency data and HC-based 
-    testing. 
+    A class to measure similarity of documents to multiple authors, 
+    especially Higher Criticism-based similarity. 
+    ===============================================================
 
-    Args:
-        data -- is a DataFrame with columns doc_id|author|text
-                  (author represents the class idnetifyer or 
-                    training label).
-        vocab -- reduce word counts for this set (unless vocab == []).
-        vocab_size -- extract vocabulary of this size 
-                      (only if vocab == []).
-        ngram_range -- ngram parameter for tf_vectorizer
-        stbl -- a parameter determinining type of HC statistic.
-        words_to_ignore -- tell tokenizer to ignore words in
-                           this list.
+    Params:
+        data            is a DataFrame with columns doc_id|author|text
+                        (author represents the class idnetifyer or 
+                        training label).
+        vocab           reduce word counts for this set (unless vocab == []).
+        vocab_size      extract vocabulary of this size 
+                        (only if vocab == []).
+        ngram_range     ngram parameter for tf_vectorizer
+        stbl            a parameter determinining type of HC statistic.
+        words_to_ignore tell tokenizer to ignore words in this list.
     """
-    def __init__(self, data, vocab=[], stbl=True,
+    def __init__(self, data, vocab=None, stbl=True,
                  randomize=False, gamma=0.2, verbose=True,
                  pval_thresh=1.1,
                   **kwargs
                 ) :
-        """
-        Args:
-            data -- is a DataFrame with columns doc_id|author|text
-                      (author represents the class idnetifyer or 
-                        training label)
-            vocab -- reduce word counts for this set (unless vocab == [])
-            vocab_size -- extract vocabulary of this size 
-                          (only if vocab == [])
-            ngram_range -- ngram parameter for tf_vectorizer
-            stbl -- a parameter determinining type of HC statistic
-            words_to_ignore -- tell tokenizer to ignore words in
-                               this list
-        """
+        
+        # model parameters: 
         self._pval_thresh = pval_thresh
         self._verbose = verbose
-        self._AuthorModel = {}  #:  list of FreqTable objects, one for
-        #: each author.
         self._ngram_range = kwargs.get('ngram_range', (1,1))  #: ng-range used
         #: in the model.
         self._stbl = stbl  #:  type of HC statistic to use.
@@ -51,9 +38,11 @@ class AuthorshipAttributionMulti(object):
         self._gamma = gamma
 
         self._vocab = vocab
-        if len(self._vocab) == 0 : #get vocabulary unless supplied
+        if self._vocab is None : #get vocabulary unless supplied
             self._get_vocab(data, **kwargs)
-        #compute author-models
+
+        #compute FreqTable for each author
+        self._AuthorModel = {}  #: list of FreqTable objects
         self._compute_author_models(data)
 
     def _get_vocab(self, data, **kwargs) :
@@ -89,12 +78,15 @@ class AuthorshipAttributionMulti(object):
 
         Override this fucntion to process other input format. 
 
+
         Args:     
-            X -- list of texts 
-            document_names -- list of strings representing the names
+        ------
+            X                 list of texts 
+            document_names    list of strings representing the names
                               of each text in X
 
         Returs:
+        -------
             FreqTable object
         """
 
@@ -128,22 +120,24 @@ class AuthorshipAttributionMulti(object):
         Attribute text x with one of the authors or '<UNK>'. 
 
         Args:
-            x -- string representing the test document 
-            method -- designate which score to use. Supported method:
-            'HC', 'HC_rank', 'chisq', 'chisq_pval', 'cosine'
-            unk_thresh -- minimal score below which the text is 
-            attributed to one of the authors in the model and not assigned
-            the label '<UNK>'.
-            LOO -- indicates whether to compute rank in a leave-of-out mode
-            It leads to more accurate rank-based testing but require more 
-            computations. 
+        -----
+            x           string representing the test document 
+            method      designate which score to use. Supported method:
+                        'HC', 'HC_rank', 'chisq', 'chisq_pval', 'cosine'
+            unk_thresh  minimal score below which the text is 
+                        attributed to one of the authors in the model and not 
+                        assigned the label '<UNK>'.
+            LOO         indicates whether to compute rank in a leave-of-out mode
+                        it leads to more accurate rank-based testing but require
+                        more computations. 
 
         Returns:
-            pred -- one of the keys in self._AuthorModel or '<UNK>'
-            marg -- ratio of second smallest score to smallest scroe
+        --------
+            pred        one of the keys in self._AuthorModel or '<UNK>'
+            marg        ratio of second smallest score to smallest scroe
 
         Note:
-            Currently scores 'HC', 'rank' and 'cosine'
+            Currently methods 'HC', 'rank' and 'cosine'
             are supported. 
         """
 
@@ -187,9 +181,10 @@ class AuthorshipAttributionMulti(object):
     def internal_stats_corpus(self):
         """Compute scores of each pair of corpora within the model.
             
-        Returns: 
-            a dataframe with rows: 
-            doc_id|author|HC|ChiSq|cosine|rank|wrt_author
+        Returns:
+        -------- 
+            DataFrame with rows: 
+            doc_id, author, HC, ChiSq, cosine, rank, wrt_author
 
             doc_id -- the document identifyer.
             wrt_author -- author of the corpus against which the
@@ -230,9 +225,11 @@ class AuthorshipAttributionMulti(object):
 
     def get_doc_stats(self, doc_id, author,
      wrt_authors = [], LOO = False) :
-        """ stats wrt to all authors in list wrt_authors of 
-            a single document within the model. 
-         """
+        """ 
+        document statistics wrt to all authors in list wrt_authors of 
+        a single document within the model. 
+
+        """
 
         try :
             md0 = self._AuthorModel[author]
@@ -263,6 +260,7 @@ class AuthorshipAttributionMulti(object):
                                                  within=True,
                                                  LOO_rank=LOO
                                                  )
+                BJ, _ = md1.get_BJSim(dtbl, within=True)
                 CR, CR_pval, _ = md1.get_ChiSquare(
                     dtbl,
                     within=True,
@@ -291,6 +289,7 @@ class AuthorshipAttributionMulti(object):
                     dtbl,
                     lambda_="log-likelihood", LOO_rank=LOO)
                 
+                BJ, _ = md1.get_BJSim(dtbl)
                 cosine = md1.get_CosineSim(dtbl)
             df = df.append(
                 {
@@ -298,6 +297,7 @@ class AuthorshipAttributionMulti(object):
                     'author': author,
                     'wrt_author': auth1,
                     'HC': HC,
+                    'BJ' : BJ,
                     'chisq': chisq,
                     'chisq_rank' : chisq_rank,
                     'Cressie-Read' : CR,
@@ -364,7 +364,7 @@ class AuthorshipAttributionMulti(object):
         return df
 
     def predict_stats(self, x, wrt_authors=[], LOO=False):
-        """ Returns a pandas dataframe with columns representing the 
+        """ Returns DataFrame with columns representing the 
         statistics: HC score, ChiSquare, rank (of HC), cosine similarity
         where each one is obtained by comparing the input text 'x' to each
         corpus in the model.
@@ -421,21 +421,23 @@ class AuthorshipAttributionMulti(object):
         """
         Same as internal_stats but for a list of documents 
 
-        Arguments:
-            data -- list of documents with columns: doc_id|author|text
+        Args:
+        -----
+            data    list of documents with columns: doc_id|author|text
 
         Returns:
+        -------
             dataframe with rows: 
             doc_id|author|HC|ChiSq|cosine|rank|wrt_author
 
-            doc_id -- the document identifyer.
-            wrt_author -- author of the corpus against which the
-                         document is tested.
-            HC, ChiSq, cosine -- HC score, Chi-Square score, and cosine
+            doc_id      the document identifyer.
+            wrt_author  author of the corpus against which the document 
+                        is tested.
+            HC, ChiSq, cosine    HC score, Chi-Square score, and cosine
                                  similarity, respectively, between the 
                                  document and the corpus.
-            rank -- the rank of the HC score compared to other documents 
-                    within the corpus.
+            rank        the rank of the HC score compared to other documents 
+                        within the corpus.
         """
 
         df = pd.DataFrame()
@@ -476,14 +478,12 @@ class AuthorshipAttributionMulti(object):
                    randomize=randomize
                    )
 
-    def two_doc_test(self, auth_doc_pair1, auth_doc_pair2 , 
-        stbl=None) :
+    def two_doc_test(self, auth_doc_pair1, auth_doc_pair2, stbl=None) :
         """ Test two documents/corpora against each other.
-        If 
 
         Args:
         -----
-        auth_doc_pairx : tuple , first coordinate is corpus name and 
+        auth_doc_pairx   (tuple) first coordinate is corpus name and 
                                  second coorindate is document name. If document
                                  name is None, all corpus is used. 
                                  If testing a corpus agains a dcoument of that 
@@ -542,9 +542,11 @@ class AuthorshipAttributionMulti(object):
 class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
     """ 
     Same as AuthorshipAttributionMulti but input is a 
-    pd.DataFrame of the form auth-doc-lemma
+    pd.DataFrame of the form <author>, <doc_id>, <lemma>
 
-    Overrides methods 'compute_author_models' and to_docTermTable
+    Overrides methods :
+        compute_author_models 
+        to_docTermTable
     
     """
     
@@ -583,9 +585,9 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
 
         Override this fucntion to process other input format. 
 
-        Args:     
-            X -- list of texts 
-            document_names -- list of strings representing the names
+        Args: 
+            X                 list of texts 
+            document_names    list of strings representing the names
                               of each text in X
 
         Returs:
@@ -615,12 +617,14 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
 
 
 class AuthorshipAttributionMultiBinary(object):
-    """ Use pair-wise tests to determine most likely author. 
-        (creates an AuthorshipAttributionMulti object for each 
-        pair of authors and reduces the features of this object) 
+    """ 
+        A class to measure document and author similarity based on pair-wise 
+        testing of authors. It creates an AuthorshipAttributionMulti object 
+        for each pair of authors.
 
         The interface is similar to AuthorshipAttributionMultiBinary
         except that prediction can be made by majority voting.
+        =================================================================
 
     """
     def __init__(

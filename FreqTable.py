@@ -11,125 +11,38 @@ from TwoSampleHC import HC, binom_test_two_sided,\
 # complete class MultiTable
 
 
-def binom_var_test(smp1, smp2, max_cnt = 50) :
-    """
-    Args : 
-    smp1, smp2 : numpy arrays or lists of integer of equal legth
-    max_cnt : maximum diagonal value smp1 + smp2 to consider
-
-    Returns:
-    series with index = m and value = P-value
-
-    Note: 
-    Current implementation assumes equals sample sizes for smp1 and smp2
-    """
-    # Binomal varaince test.   Requires Pandas
-
-    import pandas as pd
-    
-    df_smp = pd.DataFrame({'n1' : smp1, 'n2' : smp2})
-    df_smp.loc[:,'N'] = df_smp.agg('sum', axis = 'columns')
-    df_smp = df_smp[(df_smp.N <= max_cnt) & (df_smp.N > 0)]
-    df_hist = df_smp.groupby(['n1', 'n2']).count().reset_index()
-
-    df_hist.loc[:,'m'] = df_hist.n1 + df_hist.n2
-
-    df_hist.loc[:,'N1'] = df_hist.n1 * df_hist.N
-    df_hist.loc[:,'N2'] = df_hist.n2 * df_hist.N
-
-    df_hist.loc[:,'NN1'] = df_hist.N1.sum()
-    df_hist.loc[:,'NN2'] = df_hist.N2.sum()
-
-    df_hist = df_hist.join(df_hist.filter(
-        ['m', 'N1', 'N2', 'N']).groupby('m').agg('sum'),
-                           on = 'm', rsuffix='_m')
-
-    df_hist.loc[:,'p'] = (df_hist['NN1'] - df_hist['N1_m'])\
-            / (df_hist['NN1'] + df_hist['NN2'] - df_hist['N1_m'] - df_hist['N2_m'])
-
-    df_hist.loc[:,'s'] = \
-            (df_hist.n1 - df_hist.m * df_hist.p) ** 2 * df_hist.N
-    df_hist.loc[:,'Es'] = \
-            df_hist.N_m * df_hist.m * df_hist.p * (1 - df_hist.p)
-    df_hist.loc[:,'Vs'] =  2 * df_hist.N_m \
-        * df_hist.m * (df_hist.m)*(df_hist.p * (1-df_hist.p)) ** 2
-    df_hist = df_hist.join(df_hist.groupby('m').agg('sum').s,
-                         on = 'm', rsuffix='_m')
-    df_hist.loc[:,'z'] = (df_hist.s_m - df_hist.Es) / np.sqrt(df_hist.Vs)
-    df_hist.loc[:,'pval'] = \
-        df_hist.z.apply(lambda z : scipy.stats.norm.cdf(-np.abs(z)))
-
-    # handle the case m=1 seperately
-    n1 = df_hist[(df_hist.n1 == 1) & (df_hist.n2 == 0)].N.values
-    n2 = df_hist[(df_hist.n1 == 0) & (df_hist.n2 == 1)].N.values
-    if len(n1) + len(n2) >= 2 :
-        df_hist.loc[df_hist.m == 1,'pval'] =\
-                     binom_test_two_sided(n1, n1 + n2 , 1/2)
-
-    return df_hist.groupby('m').pval.mean()
-     
-def two_sample_pvals_loc(c1, c2, randomize=False) :
-    #pv_bin_var = binom_var_test(c1, c2).values
-    pv_exact = two_sample_pvals(c1, c2)
-    #pv_all = np.concatenate([pv_bin_var, pv_exact])
-    return pv_exact
-
-def get_mat_sum(mat) :
-    """
-    mat can be 2D numpy array or a scipy matrix
-    """
-    if scipy.sparse.issparse(mat) :
-        return np.squeeze(np.array(mat.sum(0)))
-    else :
-        return np.squeeze(mat.sum(0))
-
-    return np.squeeze(np.array(mat.sum(0))).astype(int)
-
-def get_mat_row(mat, r) :
-    """
-    mat can be 2D numpy array or a scipy matrix
-    """
-    if scipy.sparse.issparse(mat) :
-        return np.squeeze(mat[r,:].toarray()).astype(int)
-    else :
-        return mat[r,:]
-
-
 class FreqTable(object):
     """ 
-    Represents 1-way contingency table of multiple dataset
-    Each feature has a unique name 
-    Each dataset has a unique name
-    Allows to check similarity of the table to other tables
+    A class to represent contingency table of associated with multiple datasets
+    Interface for checking the similarity of the table to other tables
     using Higher Criticism (HC) and other statistics. Designed to 
     accelerate computation of HC
+    ==========================================================================
 
  
     Parameters:
     ---------- 
-    dtm : doc-term matrix.
-    column_labels : list of names for each column of dtm.
-    row_labels :  list of names for each row of dtm.
-    stbl : boolean) -- type of HC statistic to use 
-    randomize : boolean -- randomized P-values 
-    gamma  : boolean 
-
-    To Do:
-        - rank of every stat in LOO
+    dtm             doc-term matrix.
+    column_labels   list of names for each column of dtm (features)
+    row_labels      list of names for each row of dtm (name of dataset)
+    stbl            Indiacate type of HC statistic to use 
+    randomize       indicate whether to randomized P-values or not 
+    gamma           HC lower P-value fraction limit
 
     """
+
     def __init__(self, dtm, column_labels=[], row_labels=[],
         stbl=True, gamma=0.2, randomize=False, pval_thresh=1.1) :
         """ 
         Args
         ----
-        dtm : (sparse) doc-term matrix.
-        column_labels : list of names for each column of dtm.
-        row_labels : list of names for each row of dtm.
+        dtm             (sparse) doc-term matrix.
+        column_labels   list of names for each column of dtm.
+        row_labels      list of names for each row of dtm.
 
         """
 
-        if len(row_labels) == []:
+        if len(row_labels) < dtm.shape[0] :
             row_labels = ["smp" + str(i) for i in range(dtm.shape[0])]
         self._row_labels = dict([
             (s, i) for i, s, in enumerate(row_labels[:dtm.shape[0]])
@@ -157,9 +70,39 @@ class FreqTable(object):
         
         self.__compute_internal_stat()
 
+
+    @staticmethod     
+    def two_sample_pvals_loc(c1, c2, randomize=False) :
+        #pv_bin_var = binom_var_test(c1, c2).values
+        pv_exact = two_sample_pvals(c1, c2)
+        #pv_all = np.concatenate([pv_bin_var, pv_exact])
+        return pv_exact
+
+    @staticmethod
+    def get_mat_sum(mat) :
+        """
+        mat can be 2D numpy array or a scipy matrix
+        """
+        if scipy.sparse.issparse(mat) :
+            return np.squeeze(np.array(mat.sum(0))).astype(int)
+        else :
+            return np.squeeze(mat.sum(0))
+
+    @staticmethod
+    def get_mat_row(mat, r) :
+        """
+        mat can be 2D numpy array or a scipy matrix
+        """
+        if scipy.sparse.issparse(mat) :
+            return np.squeeze(mat[r,:].toarray()).astype(int)
+        else :
+            return mat[r,:]
+
+
     def row_similarity(self, c1, c2) :
         hc = HC_sim(c1, c2, gamma=self._gamma, 
-                randomize=self._randomize, pval_thresh=self._pval_thresh)
+                randomize=self._randomize,
+                pval_thresh=self._pval_thresh)
         return hc
 
     def __compute_internal_stat(self, compute_pvals=True):
@@ -172,14 +115,6 @@ class FreqTable(object):
         
         self._internal_scores = []
 
-        # for row in self._dtm:
-        #     if self._sparse : 
-        #         cnt = np.squeeze(np.array(row.todense())).astype(int)
-        #     else :
-        #         cnt = np.squeeze(np.array(row)).astype(int)
-        #     pv = self._Pvals_from_counts(cnt, within = True)
-        #     hc, p_thr = self.__compute_HC(pv)
-        #     self._internal_scores += [hc]
         
         self._internal_scores = self._per_row_similarity_LOO(
             self.row_similarity)
@@ -250,11 +185,11 @@ class FreqTable(object):
             cnt2 = cnt0 - cnt1
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
-            pv = two_sample_pvals_loc(cnt1, cnt2,
+            pv = FreqTable.two_sample_pvals_loc(cnt1, cnt2,
                      randomize=self._randomize,
                      )
         else:
-            pv = two_sample_pvals_loc(cnt1, cnt0,
+            pv = FreqTable.two_sample_pvals_loc(cnt1, cnt0,
                  randomize=self._randomize,
                         )
         return pv 
@@ -302,7 +237,7 @@ class FreqTable(object):
             dtbl -- FreqTable object 
         """
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
-        pv = two_sample_pvals_loc(cnt1, cnt0,
+        pv = FreqTable.two_sample_pvals_loc(cnt1, cnt0,
                  randomize=self._randomize,
                         )
         return pv
@@ -414,7 +349,7 @@ class FreqTable(object):
             # similarity of new_row
             
             cnt0 = np.squeeze(new_row)
-            cnt1 = get_mat_sum(mat) - cnt0
+            cnt1 = FreqTable.get_mat_sum(mat) - cnt0
             if np.any(cnt1 < 0):
                 raise ValueError("'within == True' is invalid")
 
@@ -424,10 +359,10 @@ class FreqTable(object):
 
         r, _ = mat.shape
 
-        cnt_total = get_mat_sum(mat) 
+        cnt_total = FreqTable.get_mat_sum(mat) 
         
         for i in range(r) :
-            cnt0 = get_mat_row(mat, i)
+            cnt0 = FreqTable.get_mat_row(mat, i)
             cnt1 = cnt_total - cnt0
                 
             #import pdb; pdb.set_trace()
@@ -442,7 +377,7 @@ class FreqTable(object):
         mat = self.__dtm_plus_row(row)
         
         def func(c1, c2) :
-            return two_sample_pvals_loc(c1, c2, 
+            return FreqTable.two_sample_pvals_loc(c1, c2, 
                             randomize=self._randomize)
 
         r,c = mat.shape
@@ -557,6 +492,14 @@ class FreqTable(object):
 
         return score, pval, rank
         
+    def get_BJSim(self, dtbl, within=False):
+        """ Berk-Jones similarity with respect to another FreqTable 
+        object 'dtbl'
+        """
+        cnt0, cnt1 = self.__get_counts(dtbl, within=within)
+
+        return BJ_sim(cnt0, cnt1)
+
 
     def get_CosineSim(self, dtbl, within=False):
         """ Cosine similarity with respect to another FreqTable 
@@ -576,12 +519,13 @@ class FreqTable(object):
                     are subtracted from FreqTable._dtm
          """
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
-        pvals = two_sample_pvals_loc(cnt0, cnt1)
+        pvals = FreqTable.two_sample_pvals_loc(cnt0, cnt1)
         #pvals = self.get_Pvals(dtbl, within=within)
         HC, p_thr = self.__compute_HC(pvals)
 
         return HC
 
+    
     def get_rank(self, dtbl, sim_measure=None, within=False, LOO=True) :
         """ returns the rank of the similarity of dtbl compared to each
             row in the data-table. 

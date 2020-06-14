@@ -28,6 +28,31 @@ def HC_sim(c1, c2, gamma=0.15, randomize=False, pval_thresh=1.1) :
     hc, _ = HC(pvals_red).HCstar(gamma=gamma)
     return hc
 
+def BJ_sim(c1, c2, gamma=0.1, randomize=False, pval_thresh=1.1) : 
+    """
+    Berk-Jones (BJ) similarity of two discrete samples
+
+    Args:
+    -----
+    c1, c2 : two lists of integers of equal length
+    gamma : lower fraction of P-values
+    randomize : randomized Pvalues or normalization
+    pval_thresh : only use P-values below this value. Has not effect
+                  if pval_thresh > 1. 
+
+    Returns:
+    -------
+    HCstar of the binomial allocation P-values of the two lists
+    """
+    pvals = two_sample_pvals(c1, c2, randomize=randomize)
+    pvals_red = pvals[pvals < pval_thresh]
+    
+    if len(pvals_red) == 0 :
+        return np.nan
+
+    bj, _ = HC(pvals_red).BJ(gamma=gamma)
+    return bj
+
 def two_sample_chi_square(c1, c2, lambda_="pearson"):
     """returns the Chi-Square score of the two samples c1 and c2
      (representing counts). Null cells are ignored. 

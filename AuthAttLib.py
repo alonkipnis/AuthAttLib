@@ -260,7 +260,7 @@ class AuthorshipAttributionMulti(object):
                                                  within=True,
                                                  LOO_rank=LOO
                                                  )
-                BJ, _ = md1.get_BJSim(dtbl, within=True)
+                #bj = md1.get_BJSim(dtbl, within=True)
                 CR, CR_pval, _ = md1.get_ChiSquare(
                     dtbl,
                     within=True,
@@ -289,7 +289,7 @@ class AuthorshipAttributionMulti(object):
                     dtbl,
                     lambda_="log-likelihood", LOO_rank=LOO)
                 
-                BJ, _ = md1.get_BJSim(dtbl)
+                #bj = md1.get_BJSim(dtbl)
                 cosine = md1.get_CosineSim(dtbl)
             df = df.append(
                 {
@@ -297,7 +297,7 @@ class AuthorshipAttributionMulti(object):
                     'author': author,
                     'wrt_author': auth1,
                     'HC': HC,
-                    'BJ' : BJ,
+                    'BJ' : bj,
                     'chisq': chisq,
                     'chisq_rank' : chisq_rank,
                     'Cressie-Read' : CR,

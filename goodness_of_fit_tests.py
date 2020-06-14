@@ -48,7 +48,7 @@ def BJ_sim(c1, c2, gamma=0.1, randomize=False, pval_thresh=1.1) :
     pvals_red = pvals[pvals < pval_thresh]
     
     if len(pvals_red) == 0 :
-        return np.nan, np.nan
+        return np.nan
 
     bj, _ = HC(pvals_red).BJ(gamma=gamma)
     return bj

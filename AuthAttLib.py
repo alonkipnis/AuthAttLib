@@ -4,6 +4,7 @@ from tqdm import *
 from utils import to_docTermCounts,\
  n_most_frequent_words, extract_ngrams
 from FreqTable import FreqTable
+import warnings
             
 class AuthorshipAttributionMulti(object):
     """
@@ -44,6 +45,7 @@ class AuthorshipAttributionMulti(object):
         #compute FreqTable for each author
         self._AuthorModel = {}  #: list of FreqTable objects
         self._compute_author_models(data)
+        self._inter_similarity = None
 
     def _get_vocab(self, data, **kwargs) :
         # create vocabulary form data
@@ -61,13 +63,14 @@ class AuthorshipAttributionMulti(object):
             data_auth = data[data.author == auth]
             if self._verbose :
                 print("\t Creating author-model for {} using {} features..."\
-                    .format(auth, len(self._vocab)))
+                    .format(auth, len(self._vocab)), end =" ")
 
             self._AuthorModel[auth] = self._to_docTermTable(
                                 list(data_auth.text),
                                 document_names=list(data_auth.doc_id)
                                 )
             if self._verbose :
+                print("Done.")
                 print("\t\tfound {} documents and {} relevant tokens."\
             .format(len(data_auth),
                 self._AuthorModel[auth]._counts.sum()))
@@ -309,10 +312,54 @@ class AuthorshipAttributionMulti(object):
                 ignore_index=True)
         return df
 
-    def internal_stats(self, authors = [], 
-            wrt_authors=[], 
-            LOO=False, 
-            verbose=False):
+    def compute_inter_similarity(self, authors = [], wrt_authors=[], 
+            LOO=False, verbose=False) :
+        """
+        Compute scores of each document with respect to the corpus of
+        each author. When tested against its own corpus, the document
+        is removed from that corpus. 
+        
+        Args:
+        authors -- subset of the authors in the model. Test only documents
+                belonging to these authors
+        wrt_authors -- subset of the authors in the model with respect
+                to which the scores of each document are evaluated.
+                If empty, evaluate with respect to all authors.
+        LOO -- indicates whether to compute rank in a leave-of-out mode.
+            This mode provides more accurate rank-based testing but require more 
+            computations.
+
+        Sotores output in a pandas DataFrame 
+        'AuthorshipAttributionMulti.doc_stats'
+
+        """
+
+        df = pd.DataFrame()
+
+        if len(authors) == 0:
+            # evaluate with resepct to all authors in the model
+            authors = self._AuthorModel
+
+        for auth0 in authors :
+            #tqdm(wrt_authors):
+            md0 = self._AuthorModel[auth0]
+            #for auth1 in self._AuthorModel:
+            #    md1 = self._AuthorModel[auth1]
+            lo_docs = md0.get_row_labels()
+            for dn in lo_docs:
+                if verbose :
+                    print("testing {} by {}".format(dn,auth0))
+                df = df.append(self.get_doc_stats(dn, auth0,
+                 wrt_authors = wrt_authors,
+                  LOO = LOO), ignore_index=True)
+
+        return self._inter_similarity = df
+
+    def get_inter_similarity() :
+        return self._inter_similarity
+
+    def internal_stats(self, authors = [], wrt_authors=[], 
+            LOO=False, verbose=False):
         """
         Compute scores of each document with respect to the corpus of
         each author. When tested against its own corpus, the document
@@ -341,6 +388,10 @@ class AuthorshipAttributionMulti(object):
             rank -- the rank of the HC score compared to other documents 
             within the corpus.
         """
+
+        warnings.warn("Use 'AuthorshipAttributionMulti.compute_inter_similarity'"
+        " and 'AuthorshipAttributionMulti.get_inter_similarity' instead.",
+         DeprecationWarning, stacklevel=1)
 
         df = pd.DataFrame()
 
@@ -569,12 +620,14 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
         for auth in lo_authors:
             ds_auth = ds[ds.author == auth]
             if self._verbose :
-                print("\t Creating author-model for {}...".format(auth))
+                print("\t Creating author-model for {}...".format(auth), 
+                    end =" ")
             
             dtm = self._to_docTermTable(ds_auth)
             dtm.change_vocabulary(new_vocabulary=self._vocab)
             self._AuthorModel[auth] = dtm
             if self._verbose :
+                print(Done.)
                 print("\t\tfound {} documents and {} relevant tokens."\
                 .format(len(self._AuthorModel[auth].get_row_labels()),
                     self._AuthorModel[auth]._counts.sum()))    
@@ -663,7 +716,7 @@ class AuthorshipAttributionMultiBinary(object):
         print("Found {} author-pairs".format(len(lo_author_pairs)))
         for ap in lo_author_pairs:  # AuthorPair model for each pair
             print("MultiBinaryAuthorModel: Creating model for {} vs {}..."\
-                .format(ap[0],ap[1]))
+                .format(ap[0],ap[1]), end =" ")
 
             data_pair = data[data.author.isin(list(ap))]
             ap_model = AuthorshipAttributionMulti(
@@ -675,11 +728,12 @@ class AuthorshipAttributionMultiBinary(object):
                                     stbl=stbl,
                                     randomize=self._randomize
                                     )
+            print("Done.")
 
             self._AuthorPairModel[ap] = ap_model
             if reduce_features == True:
                 feat = self.reduce_features_for_author_pair(ap)
-                print("Reduced to {} features...".format(len(feat)))
+                print("\t\tReduced to {} features...".format(len(feat)))
                 
     def reduce_features_for_author_pair(self, auth_pair) :
         """

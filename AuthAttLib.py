@@ -25,7 +25,7 @@ class AuthorshipAttributionMulti(object):
     """
     def __init__(self, data, vocab=None, stbl=True,
                  randomize=False, gamma=0.2, verbose=True,
-                 pval_thresh=1.1,
+                 pval_thresh=1.1, min_cnt=3,
                   **kwargs
                 ) :
         
@@ -37,6 +37,7 @@ class AuthorshipAttributionMulti(object):
         self._stbl = stbl  #:  type of HC statistic to use.
         self._randomize = randomize #: randomize pvalue or not
         self._gamma = gamma
+        self._min_cnt = min_cnt
 
         self._vocab = vocab
         if self._vocab is None : #get vocabulary unless supplied
@@ -353,7 +354,7 @@ class AuthorshipAttributionMulti(object):
                  wrt_authors = wrt_authors,
                   LOO = LOO), ignore_index=True)
 
-        return self._inter_similarity = df
+        self._inter_similarity = df
 
     def get_inter_similarity() :
         return self._inter_similarity

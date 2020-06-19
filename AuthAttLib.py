@@ -534,11 +534,11 @@ class AuthorshipAttributionMulti(object):
 
         Args:
         -----
-        auth_doc_pairx   (tuple) first coordinate is corpus name and 
-                                 second coorindate is document name. If document
-                                 name is None, all corpus is used. 
-                                 If testing a corpus agains a dcoument of that 
-                                 corpus, pass 
+        auth_doc_pairx   (tuple) first coordinate represents the corpus name and 
+                                second coorindate represents the document name.
+                                If document name is None, all corpus is used. 
+                                If testing a corpus agains a dcoument of that 
+                                corpus, pass 
             auth_doc_pair1 = (<corpus_name>, None)
             auth_doc_pair1 = (<corpus_name>, <doc_id>)
 

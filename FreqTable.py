@@ -19,29 +19,21 @@ class FreqTable(object):
     accelerate computation of HC
     ==========================================================================
 
- 
     Parameters:
     ---------- 
-    dtm             doc-term matrix.
-    column_labels   list of names for each column of dtm (features)
-    row_labels      list of names for each row of dtm (name of dataset)
+    dtm             feature-count matrix.
+    column_labels   list of names for each column of dtm (feature name)
+    row_labels      list of names for each row of dtm (e.g., document ID)
     stbl            Indiacate type of HC statistic to use 
     randomize       indicate whether to randomized P-values or not 
     gamma           HC lower P-value fraction limit
+    min_cnt         ignore features whose total count is below this number
 
     """
 
     def __init__(self, dtm, column_labels=[], row_labels=[],
-        stbl=True, gamma=0.2, randomize=False, pval_thresh=1.1) :
-        """ 
-        Args
-        ----
-        dtm             (sparse) doc-term matrix.
-        column_labels   list of names for each column of dtm.
-        row_labels      list of names for each row of dtm.
-
-        """
-
+        min_cnt=0, stbl=True, gamma=0.2, randomize=False, pval_thresh=1.1) :
+        
         if len(row_labels) < dtm.shape[0] :
             row_labels = ["smp" + str(i) for i in range(dtm.shape[0])]
         self._row_labels = dict([
@@ -58,9 +50,10 @@ class FreqTable(object):
             self._dtm = dtm
         self._stbl = stbl  #: type of HC score to use 
         self._randomize = randomize #: randomize P-values or not
-        self._gamma = gamma
-        #self._gamma = gamma # gamma parameter for HC statistic
-        self._pval_thresh = pval_thresh #only consider P-values smaller than this
+        self._gamma = gamma # gamma parameter for HC statistic
+        self._min_cnt = min_cnt # ignore features whose total count is below 
+                                # this number when getting p-vals from counts
+        self._pval_thresh = pval_thresh #only consider P-values smaller than
 
         if dtm.sum() == 0:
             raise ValueError(
@@ -72,11 +65,12 @@ class FreqTable(object):
 
 
     @staticmethod     
-    def two_sample_pvals_loc(c1, c2, randomize=False) :
+    def two_sample_pvals_loc(c1, c2, randomize=False, min_cnt=0) :
         #pv_bin_var = binom_var_test(c1, c2).values
         pv_exact = two_sample_pvals(c1, c2)
         #pv_all = np.concatenate([pv_bin_var, pv_exact])
-        return pv_exact
+        pv_all = pv_exact[c1 + c2 >= min_cnt]
+        return pv_all
 
     @staticmethod
     def get_mat_sum(mat) :
@@ -97,7 +91,6 @@ class FreqTable(object):
             return np.squeeze(mat[r,:].toarray()).astype(int)
         else :
             return mat[r,:]
-
 
     def row_similarity(self, c1, c2) :
         hc = HC_sim(c1, c2, gamma=self._gamma, 
@@ -186,11 +179,11 @@ class FreqTable(object):
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
             pv = FreqTable.two_sample_pvals_loc(cnt1, cnt2,
-                     randomize=self._randomize,
+                     randomize=self._randomize, min_cnt=self._min_cnt
                      )
         else:
             pv = FreqTable.two_sample_pvals_loc(cnt1, cnt0,
-                 randomize=self._randomize,
+                 randomize=self._randomize, min_cnt=self._min_cnt
                         )
         return pv 
 
@@ -238,13 +231,13 @@ class FreqTable(object):
         """
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         pv = FreqTable.two_sample_pvals_loc(cnt1, cnt0,
-                 randomize=self._randomize,
+                 randomize=self._randomize, min_cnt=self._min_cnt
                         )
         return pv
 
     def two_table_HC_test(self, dtbl,
                  within=False, stbl=None,
-                 randomize=False) :
+                 randomize=False, min_cnt=3) :
         """
         counts, p-values, and HC with 
         respect to another FreqTable
@@ -269,7 +262,9 @@ class FreqTable(object):
         df = two_sample_test_df(cnt0, cnt1,
              stbl=stbl,
             randomize=self._randomize,
-            gamma=self._gamma)
+            gamma=self._gamma,
+            min_cnt=min_cnt
+            )
         lbls = self._column_labels
         try :
             df.loc[:,'feat'] = self._column_labels
@@ -378,7 +373,9 @@ class FreqTable(object):
         
         def func(c1, c2) :
             return FreqTable.two_sample_pvals_loc(c1, c2, 
-                            randomize=self._randomize)
+                            randomize=self._randomize,
+                            min_cnt=self._min_cnt
+                            )
 
         r,c = mat.shape
         pv_list = []
@@ -566,8 +563,6 @@ class FreqTable(object):
             rank = np.nan
         
         return rank
-
-
 
     def get_HC_rank_features(self,
         dtbl,           

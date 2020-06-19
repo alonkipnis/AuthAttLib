@@ -628,7 +628,7 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
             dtm.change_vocabulary(new_vocabulary=self._vocab)
             self._AuthorModel[auth] = dtm
             if self._verbose :
-                print(Done.)
+                print("Done.")
                 print("\t\tfound {} documents and {} relevant tokens."\
                 .format(len(self._AuthorModel[auth].get_row_labels()),
                     self._AuthorModel[auth]._counts.sum()))    

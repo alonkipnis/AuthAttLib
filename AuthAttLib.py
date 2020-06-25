@@ -356,7 +356,7 @@ class AuthorshipAttributionMulti(object):
 
         self._inter_similarity = df
 
-    def get_inter_similarity() :
+    def get_inter_similarity(self) :
         return self._inter_similarity
 
     def internal_stats(self, authors = [], wrt_authors=[], 

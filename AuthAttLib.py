@@ -98,14 +98,14 @@ class AuthorshipAttributionMulti(object):
                             vocab=self._vocab,
                             ngram_range=self._ngram_range)
 
-
         return FreqTable(dtm,
                     column_labels=self._vocab,
                     row_labels=document_names,
                     stbl=self._stbl,
                     randomize=self._randomize,
                     gamma=self._gamma,
-                    pval_thresh=self._pval_thresh
+                    pval_thresh=self._pval_thresh,
+                    min_cnt=self._min_cnt
                     )
 
     def _recompute_author_models(self):
@@ -665,7 +665,8 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
         dtm = FreqTable(mat, column_labels=fn, row_labels=dn,
                     gamma = self._gamma, stbl=self._stbl,
                     randomize=self._randomize,
-                    pval_thresh=self._pval_thresh
+                    pval_thresh=self._pval_thresh,
+                    min_cnt=self._min_cnt
                     )
         return dtm
 

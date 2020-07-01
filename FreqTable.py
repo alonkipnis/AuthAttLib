@@ -1,7 +1,7 @@
 import numpy as np
 import scipy
 from scipy.sparse import vstack, coo_matrix
-from goodness_of_fit_tests import *
+from .goodness_of_fit_tests import *
 from sklearn.neighbors import NearestNeighbors
     
 import sys

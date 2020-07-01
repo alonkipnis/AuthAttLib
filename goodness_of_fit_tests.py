@@ -1,6 +1,7 @@
 from scipy.stats import chi2_contingency, ks_2samp, norm
 from scipy.spatial.distance import cosine
-from TwoSampleHC import two_sample_pvals, HC
+
+from .TwoSampleHC import two_sample_pvals, HC
 import numpy as np
 
 def HC_sim(c1, c2, gamma=0.15, randomize=False, pval_thresh=1.1) : 
@@ -15,7 +16,7 @@ def HC_sim(c1, c2, gamma=0.15, randomize=False, pval_thresh=1.1) :
     pval_thresh : only use P-values below this value. Has not effect
                   if pval_thresh > 1. 
 
-    Returns:
+    Returns: 
     -------
     HCstar of the binomial allocation P-values of the two lists
     """

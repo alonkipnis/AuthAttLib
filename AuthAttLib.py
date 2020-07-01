@@ -355,6 +355,7 @@ class AuthorshipAttributionMulti(object):
                   LOO = LOO), ignore_index=True)
 
         self._inter_similarity = df
+        return self._inter_similarity
 
     def get_inter_similarity(self) :
         return self._inter_similarity

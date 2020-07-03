@@ -236,9 +236,7 @@ class FreqTable(object):
                         )
         return pv
 
-    def two_table_HC_test(self, dtbl,
-                 within=False, stbl=None,
-                 randomize=False, min_cnt=3) :
+    def two_table_HC_test(self, dtbl, **kwargs) :
         """
         counts, p-values, and HC with 
         respect to another FreqTable
@@ -246,6 +244,7 @@ class FreqTable(object):
         Args:
         -----
         dtbl : another FreqTable to test agains
+
 
         Returns:
         -------
@@ -256,14 +255,17 @@ class FreqTable(object):
                 when feature is a tuple
         
         """
-        if stbl == None :
-            stbl = self._stbl
+        stbl = kwargs.get('stbl', self._stbl)
+        randomize = kwargs.get('randomize', self._stbl)
+        gamma = kwargs.get('gamma', self._gamma)
+        within = kwargs.get('within', False)
+        min_cnt = kwargs.get('min_cnt', self._min_cnt)
 
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         df = two_sample_test_df(cnt0, cnt1,
              stbl=stbl,
-            randomize=self._randomize,
-            gamma=self._gamma,
+            randomize=randomize,
+            gamma=gamma,
             min_cnt=min_cnt
             )
         lbls = self._column_labels

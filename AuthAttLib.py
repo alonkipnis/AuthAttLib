@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from tqdm import *
-from utils import to_docTermCounts,\
+from .utils import to_docTermCounts,\
  n_most_frequent_words, extract_ngrams
 from .FreqTable import FreqTable
 import warnings

@@ -65,7 +65,6 @@ class FreqTable(object):
         
         self.__compute_internal_stat()
 
-
     @staticmethod     
     def two_sample_pvals_loc(c1, c2, randomize=False, min_cnt=0) :
         #pv_bin_var = binom_var_test(c1, c2).values
@@ -210,7 +209,7 @@ class FreqTable(object):
         if list(dtbl._column_labels) != list(self._column_labels):
             print(
             "Features of 'dtbl' do not match FreqTable"
-            "intance. Changing dtbl accordingly."
+            "instance. Changing dtbl accordingly."
             )
             #Warning for changing the test object
             dtbl.change_vocabulary(self._column_labels)

@@ -1,13 +1,13 @@
 import numpy as np
 import scipy
 from scipy.sparse import vstack, coo_matrix
-from .goodness_of_fit_tests import *
 from sklearn.neighbors import NearestNeighbors
     
 import sys
-sys.path.append('./TwoSampleHC')
+#sys.path.append('./TwoSampleHC')
 from .TwoSampleHC import HC, binom_test_two_sided,\
          two_sample_pvals, two_sample_test_df
+from .goodness_of_fit_tests import *
     
 #To do :
 # complete class MultiTable

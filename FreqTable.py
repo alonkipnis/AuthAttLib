@@ -6,7 +6,7 @@ from sklearn.neighbors import NearestNeighbors
 import sys
 #sys.path.append('./TwoSampleHC')
 from .TwoSampleHC import HC, binom_test_two_sided,\
-         two_sample_pvals, two_sample_test_df
+         two_sample_pvals, two_sample_test_df, binom_var_test
 from .goodness_of_fit_tests import *
     
 #To do :
@@ -67,10 +67,11 @@ class FreqTable(object):
 
     @staticmethod     
     def two_sample_pvals_loc(c1, c2, randomize=False, min_cnt=0) :
-        #pv_bin_var = binom_var_test(c1, c2).values
-        pv_exact = two_sample_pvals(c1, c2)
-        #pv_all = np.concatenate([pv_bin_var, pv_exact])
-        pv_all = pv_exact[c1 + c2 >= min_cnt]
+        pv_bin_var = binom_var_test(c1, c2).values
+        pv_exact = two_sample_pvals(c1, c2, randomize=randomize)
+        pv_exact = pv_exact[c1 + c2 >= min_cnt]
+
+        pv_all = np.concatenate([pv_bin_var, pv_exact])
         return pv_all
 
     @staticmethod

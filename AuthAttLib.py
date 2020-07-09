@@ -242,9 +242,8 @@ class AuthorshipAttributionMulti(object):
             dtbl = md0.get_row_as_FreqTable(doc_id)
         except ValueError:
             print("Document {} by author {}".format(doc_id,author)\
-                +" has empty set of features")
+                +" has empty set of features.")
             return None
-
 
         df = pd.DataFrame()
 
@@ -256,8 +255,7 @@ class AuthorshipAttributionMulti(object):
             md1 = self._AuthorModel[auth1]
                 
             if author == auth1:
-                #HC, rank, feat = md1.get_HC_rank_features(
-                   # dtbl, LOO=LOO, within=True)
+                
                 HC = md1.get_HC(dtbl, within=True)
                 rank = md1.get_rank(dtbl, LOO=LOO, within=True)
                 chisq, chisq_pval, chisq_rank = md1.get_ChiSquare(dtbl,
@@ -313,8 +311,7 @@ class AuthorshipAttributionMulti(object):
                 ignore_index=True)
         return df
 
-    def compute_inter_similarity(self, authors = [], wrt_authors=[], 
-            LOO=False, verbose=False) :
+    def compute_inter_similarity(self, **kwargs) :
         """
         Compute scores of each document with respect to the corpus of
         each author. When tested against its own corpus, the document
@@ -337,10 +334,12 @@ class AuthorshipAttributionMulti(object):
 
         df = pd.DataFrame()
 
-        if len(authors) == 0:
-            # evaluate with resepct to all authors in the model
-            authors = self._AuthorModel
 
+        authors = kwargs.get('authors', self._AuthorModel)
+        wrt_authors = kwargs.get('wrt_authors', self._AuthorModel)
+        LOO = kwargs.get('LOO', False)
+        verbose = kwargs.get('verbose', False)
+        
         for auth0 in authors :
             #tqdm(wrt_authors):
             md0 = self._AuthorModel[auth0]
@@ -351,8 +350,8 @@ class AuthorshipAttributionMulti(object):
                 if verbose :
                     print("testing {} by {}".format(dn,auth0))
                 df = df.append(self.get_doc_stats(dn, auth0,
-                 wrt_authors = wrt_authors,
-                  LOO = LOO), ignore_index=True)
+                        wrt_authors = wrt_authors,
+                        LOO = LOO), ignore_index=True)
 
         self._inter_similarity = df
         return self._inter_similarity
@@ -531,7 +530,7 @@ class AuthorshipAttributionMulti(object):
                    randomize=randomize
                    )
 
-    def two_doc_test(self, auth_doc_pair1, auth_doc_pair2, stbl=None) :
+    def two_doc_test(self, auth_doc_pair1, auth_doc_pair2, **kwargs) :
         """ Test two documents/corpora against each other.
 
         Args:
@@ -545,6 +544,7 @@ class AuthorshipAttributionMulti(object):
             auth_doc_pair1 = (<corpus_name>, <doc_id>)
 
         """
+        stbl = kwargs.get('stbl', True)
 
         if auth_doc_pair1[1] == None :
             md1 = self._AuthorModel[auth_doc_pair1[0]]

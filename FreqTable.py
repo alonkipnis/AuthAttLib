@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import scipy
 from scipy.sparse import vstack, coo_matrix
 from sklearn.neighbors import NearestNeighbors
@@ -56,6 +57,7 @@ class FreqTable(object):
         self._min_cnt = min_cnt # ignore features whose total count is below 
                                 # this number when getting p-vals from counts
         self._pval_thresh = pval_thresh #only consider P-values smaller than
+        self._types_of_pvals = ['binomial allocation', 'binomial variance']
 
         if dtm.sum() == 0:
             raise ValueError(
@@ -64,6 +66,7 @@ class FreqTable(object):
             )
         
         self.__compute_internal_stat()
+
 
     @staticmethod     
     def two_sample_pvals_loc(c1, c2, randomize=False, min_cnt=0) :
@@ -250,30 +253,35 @@ class FreqTable(object):
         Returns:
         -------
         DataFrame with columns representing counts, 
-        binomial allocation P-values, and HC score
+        binomial allocation P-values,
+        binom_var_p-values, 
+        and HC score
 
-        To do: think about a better way to handle mismatch
-                when feature is a tuple
-        
         """
         stbl = kwargs.get('stbl', self._stbl)
         randomize = kwargs.get('randomize', self._stbl)
         gamma = kwargs.get('gamma', self._gamma)
         within = kwargs.get('within', False)
         min_cnt = kwargs.get('min_cnt', self._min_cnt)
+        pvals_type = kwargs.get('pvals', 'binomial allocation')
 
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
-        df = two_sample_test_df(cnt0, cnt1,
-             stbl=stbl,
-            randomize=randomize,
-            gamma=gamma,
-            min_cnt=min_cnt
-            )
-        lbls = self._column_labels
-        try :
-            df.loc[:,'feat'] = self._column_labels
-        except :
-            df.loc[:,'feat'] = [self._column_labels]
+        
+        if pvals_type == 'binomial variance' :
+            df = pd.DataFrame(binom_var_test(cnt0, cnt1) )
+
+        else :
+            df = two_sample_test_df(cnt0, cnt1,
+                 stbl=stbl,
+                randomize=randomize,
+                gamma=gamma,
+                min_cnt=min_cnt
+                )
+            lbls = self._column_labels
+            try :
+                df.loc[:,'feature'] = lbls
+            except :
+                df.loc[:,'feature'] = [lbls]
         return df
 
     def change_vocabulary(self, new_vocabulary):

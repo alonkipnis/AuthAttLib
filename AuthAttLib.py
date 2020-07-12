@@ -23,21 +23,17 @@ class AuthorshipAttributionMulti(object):
         stbl            a parameter determinining type of HC statistic.
         words_to_ignore tell tokenizer to ignore words in this list.
     """
-    def __init__(self, data, vocab=None, stbl=True,
-                 randomize=False, gamma=0.2, verbose=True,
-                 pval_thresh=1.1, min_cnt=3,
-                  **kwargs
-                ) :
+    def __init__(self, data, vocab=None, ngram_range=(1,1), **kwargs) :
         
         # model parameters: 
-        self._pval_thresh = pval_thresh
-        self._verbose = verbose
-        self._ngram_range = kwargs.get('ngram_range', (1,1))  #: ng-range used
+        #self._pval_thresh = pval_thresh
+        self._verbose = kwargs.get('verbose', False)
+        self._ngram_range = ngram_range  #: ng-range used
         #: in the model.
-        self._stbl = stbl  #:  type of HC statistic to use.
-        self._randomize = randomize #: randomize pvalue or not
-        self._gamma = gamma
-        self._min_cnt = min_cnt
+        #self._stbl = stbl  #:  type of HC statistic to use.
+        #self._randomize = randomize #: randomize pvalue or not
+        #self._gamma = gamma
+        #self._min_cnt = min_cnt
 
         self._vocab = vocab
         if self._vocab is None : #get vocabulary unless supplied
@@ -45,7 +41,7 @@ class AuthorshipAttributionMulti(object):
 
         #compute FreqTable for each author
         self._AuthorModel = {}  #: list of FreqTable objects
-        self._compute_author_models(data)
+        self._compute_author_models(data, **kwargs)
         self._inter_similarity = None
 
     def _get_vocab(self, data, **kwargs) :
@@ -58,7 +54,7 @@ class AuthorshipAttributionMulti(object):
               ngram_range=self._ngram_range
               )
 
-    def _compute_author_models(self, data) :        
+    def _compute_author_models(self, data, **kwargs) :        
         lo_authors = pd.unique(data.author)
         for auth in lo_authors:
             data_auth = data[data.author == auth]
@@ -68,8 +64,8 @@ class AuthorshipAttributionMulti(object):
 
             self._AuthorModel[auth] = self._to_docTermTable(
                                 list(data_auth.text),
-                                document_names=list(data_auth.doc_id)
-                                )
+                                document_names=list(data_auth.doc_id),
+                                **kwargs)
             if self._verbose :
                 print("Done.")
                 print("\t\tfound {} documents and {} relevant tokens."\
@@ -77,7 +73,7 @@ class AuthorshipAttributionMulti(object):
                 self._AuthorModel[auth]._counts.sum()))
 
 
-    def _to_docTermTable(self, X, document_names=[]):
+    def _to_docTermTable(self, X, document_names=[], **kwargs):
         """Convert raw input X into a FreqTable object. 
 
         Override this fucntion to process other input format. 
@@ -101,11 +97,12 @@ class AuthorshipAttributionMulti(object):
         return FreqTable(dtm,
                     column_labels=self._vocab,
                     row_labels=document_names,
-                    stbl=self._stbl,
-                    randomize=self._randomize,
-                    gamma=self._gamma,
-                    pval_thresh=self._pval_thresh,
-                    min_cnt=self._min_cnt
+                    stbl=kwargs.get('stbl',True),
+                    randomize=kwargs.get('randomize',False),
+                    gamma=kwargs.get('gamma', 0.25),
+                    pval_thresh=kwargs.get('pval_thresh',1.1),
+                    min_cnt=kwargs.get('min_cnt', 3),
+                    pval_type=kwargs.get('pval_type', 'both')
                     )
 
     def _recompute_author_models(self):
@@ -255,7 +252,7 @@ class AuthorshipAttributionMulti(object):
             md1 = self._AuthorModel[auth1]
                 
             if author == auth1:
-                
+
                 HC = md1.get_HC(dtbl, within=True)
                 rank = md1.get_rank(dtbl, LOO=LOO, within=True)
                 chisq, chisq_pval, chisq_rank = md1.get_ChiSquare(dtbl,
@@ -616,7 +613,7 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
         vocab = cnt[cnt >= MIN_CNT].index.tolist()
         self._vocab = vocab
 
-    def _compute_author_models(self, ds) :
+    def _compute_author_models(self, ds, **kwargs) :
         
         lo_authors = pd.unique(ds.author)
         for auth in lo_authors:
@@ -625,7 +622,7 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
                 print("\t Creating author-model for {}...".format(auth), 
                     end =" ")
             
-            dtm = self._to_docTermTable(ds_auth)
+            dtm = self._to_docTermTable(ds_auth, **kwargs)
             dtm.change_vocabulary(new_vocabulary=self._vocab)
             self._AuthorModel[auth] = dtm
             if self._verbose :
@@ -635,7 +632,7 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
                     self._AuthorModel[auth]._counts.sum()))    
     
 
-    def _to_docTermTable(self, df):
+    def _to_docTermTable(self, df, **kwargs):
         """Convert raw input X into a FreqTable object. 
 
         Override this fucntion to process other input format. 
@@ -663,11 +660,15 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
 
         df = df[df.term.isin(self._vocab)]
         mat, dn, fn = df_to_FreqTable(df)
-        dtm = FreqTable(mat, column_labels=fn, row_labels=dn,
-                    gamma = self._gamma, stbl=self._stbl,
-                    randomize=self._randomize,
-                    pval_thresh=self._pval_thresh,
-                    min_cnt=self._min_cnt
+        dtm = FreqTable(mat,
+                    column_labels=fn,
+                    row_labels=dn,
+                    stbl=kwargs.get('stbl',True),
+                    randomize=kwargs.get('randomize',False),
+                    gamma=kwargs.get('gamma', 0.25),
+                    pval_thresh=kwargs.get('pval_thresh',1.1),
+                    min_cnt=kwargs.get('min_cnt', 3),
+                    pval_type=kwargs.get('pval_type', 'both')
                     )
         return dtm
 
@@ -683,18 +684,11 @@ class AuthorshipAttributionMultiBinary(object):
         =================================================================
 
     """
-    def __init__(
-            self,
-            data,
-            vocab=[],
-            vocab_size=100,
-            words_to_ignore=[],
-            global_vocab=False,
-            ngram_range=(1, 1),
-            stbl=True,
-            reduce_features=False,
+    def __init__(self, data, vocab=[], vocab_size=100,
+            words_to_ignore=[], global_vocab=False,
+            ngram_range=(1, 1), stbl=True, reduce_features=False,
             randomize=False,
-    ):
+                ):
         # train_data is a dataframe with at least fields: author|doc_id|text
         # vocab_size is an integer controlling the size of vocabulary
 

@@ -35,7 +35,8 @@ class FreqTable(object):
     """
 
     def __init__(self, dtm, column_labels=[], row_labels=[],
-        min_cnt=0, stbl=True, gamma=0.2, randomize=False, pval_thresh=1.1) :
+        min_cnt=0, stbl=True, gamma=0.25, randomize=False,
+         pval_thresh=1.1, pval_type='both') :
         
         if len(row_labels) < dtm.shape[0] :
             row_labels = ["smp" + str(i) for i in range(dtm.shape[0])]
@@ -57,7 +58,8 @@ class FreqTable(object):
         self._min_cnt = min_cnt # ignore features whose total count is below 
                                 # this number when getting p-vals from counts
         self._pval_thresh = pval_thresh #only consider P-values smaller than
-        self._types_of_pvals = ['binomial allocation', 'binomial variance']
+        #import pdb; pdb.set_trace()
+        self._pval_type = pval_type 
 
         if dtm.sum() == 0:
             raise ValueError(
@@ -69,7 +71,13 @@ class FreqTable(object):
 
 
     @staticmethod     
-    def two_sample_pvals_loc(c1, c2, randomize=False, min_cnt=0) :
+    def two_sample_pvals_loc(c1, c2, randomize=False,
+                         min_cnt=0, pval_type='both') :
+        if pval_type == 'variance' :
+            return binom_var_test(c1, c2).values
+        if pval_type == 'exact' :
+            return two_sample_pvals(c1, c2, randomize=randomize)
+
         pv_bin_var = binom_var_test(c1, c2).values
         pv_exact = two_sample_pvals(c1, c2, randomize=randomize)
         pv_exact = pv_exact[c1 + c2 >= min_cnt]
@@ -184,12 +192,13 @@ class FreqTable(object):
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
             pv = FreqTable.two_sample_pvals_loc(cnt1, cnt2,
-                     randomize=self._randomize, min_cnt=self._min_cnt
+                     randomize=self._randomize, min_cnt=self._min_cnt,
+                     pval_type=self._pval_type
                      )
         else:
             pv = FreqTable.two_sample_pvals_loc(cnt1, cnt0,
-                 randomize=self._randomize, min_cnt=self._min_cnt
-                        )
+                 randomize=self._randomize, min_cnt=self._min_cnt,
+                 pval_type=self._pval_type)
         return pv 
 
     def __get_counts(self, dtbl, within=False) :
@@ -236,7 +245,8 @@ class FreqTable(object):
         """
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         pv = FreqTable.two_sample_pvals_loc(cnt1, cnt0,
-                 randomize=self._randomize, min_cnt=self._min_cnt
+                 randomize=self._randomize, min_cnt=self._min_cnt,
+                 pval_type=self._pval_type
                         )
         return pv
 
@@ -299,7 +309,7 @@ class FreqTable(object):
 
         no_missing_words = 0
         for i, w in enumerate(new_vocabulary):
-            #import pdb; pdb.set_trace()
+            
             try:
                 new_dtm[:, i] = self._dtm[:, old_vocab.index(w)]
                                 
@@ -386,7 +396,8 @@ class FreqTable(object):
         def func(c1, c2) :
             return FreqTable.two_sample_pvals_loc(c1, c2, 
                             randomize=self._randomize,
-                            min_cnt=self._min_cnt
+                            min_cnt=self._min_cnt,
+                            pval_type=self._pval_type
                             )
 
         r,c = mat.shape
@@ -528,7 +539,9 @@ class FreqTable(object):
                     are subtracted from FreqTable._dtm
          """
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
-        pvals = FreqTable.two_sample_pvals_loc(cnt0, cnt1)
+        pvals = FreqTable.two_sample_pvals_loc(cnt0, cnt1, 
+            randomize=self._randomize, min_cnt=self._min_cnt,
+            pval_type=self._pval_type)
         #pvals = self.get_Pvals(dtbl, within=within)
         HC, p_thr = self.__compute_HC(pvals)
 

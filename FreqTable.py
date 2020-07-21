@@ -9,6 +9,10 @@ import sys
 from .TwoSampleHC import HC, binom_test_two_sided,\
          two_sample_pvals, two_sample_test_df, binom_var_test
 from .goodness_of_fit_tests import *
+
+import logging
+logging.basicConfig(level=logging.WARNING)
+
     
 #To do :
 # complete class MultiTable
@@ -36,7 +40,7 @@ class FreqTable(object):
 
     def __init__(self, dtm, column_labels=[], row_labels=[],
         min_cnt=0, stbl=True, gamma=0.25, randomize=False,
-         pval_thresh=1.1, pval_type='both') :
+         pval_thresh=1.1, pval_type='both', max_m=-1) :
         
         if len(row_labels) < dtm.shape[0] :
             row_labels = ["smp" + str(i) for i in range(dtm.shape[0])]
@@ -59,6 +63,7 @@ class FreqTable(object):
                                 # this number when getting p-vals from counts
         self._pval_thresh = pval_thresh #only consider P-values smaller than
         #import pdb; pdb.set_trace()
+        self._max_m = max_m
         self._pval_type = pval_type 
 
         if dtm.sum() == 0:
@@ -72,12 +77,16 @@ class FreqTable(object):
 
     @staticmethod     
     def two_sample_pvals_loc(c1, c2, randomize=False,
-                         min_cnt=0, pval_type='both') :
-        if pval_type == 'variance' :
-            return binom_var_test(c1, c2).values
-        if pval_type == 'exact' :
+                         min_cnt=0, pval_type='both',
+                         max_m=-1) :
+        if pval_type == 'stripes' :
+            logging.debug('Computing per-stripe P-values.')
+            return binom_var_test(c1, c2, max_m=max_m).values
+        if pval_type == 'cell' :
+            logging.debug('Computing per-cell P-values.')
             return two_sample_pvals(c1, c2, randomize=randomize)
 
+        logging.debug('Using both P-values types.')
         pv_bin_var = binom_var_test(c1, c2).values
         pv_exact = two_sample_pvals(c1, c2, randomize=randomize)
         pv_exact = pv_exact[c1 + c2 >= min_cnt]
@@ -174,12 +183,14 @@ class FreqTable(object):
         """ Returns pvals from a list counts 
 
         Args:
+        -----
             counts -- 1D array of feature counts.
             within -- indicates weather to subtracrt counts of dtm
                       from internal counts (this option is useful 
                         whenever we wish to compute Pvals of a 
                         document wrt to the rest)
-        Returns:
+        Return:
+        -------
             list of P-values
         """
         cnt0 = np.squeeze(np.array(self._counts))
@@ -187,18 +198,19 @@ class FreqTable(object):
 
         assert (cnt0.shape == cnt1.shape)
 
+        kwargs = {'randomize' : self._randomize,
+                'min_cnt' : self._min_cnt,
+                'pval_type' : self._pval_type,
+                'max_m' : self._max_m
+                 }
+
         if within:
             cnt2 = cnt0 - cnt1
             if np.any(cnt2 < 0):
                 raise ValueError("'within == True' is invalid")
-            pv = FreqTable.two_sample_pvals_loc(cnt1, cnt2,
-                     randomize=self._randomize, min_cnt=self._min_cnt,
-                     pval_type=self._pval_type
-                     )
+            pv = FreqTable.two_sample_pvals_loc(cnt1, cnt2, **kwargs)
         else:
-            pv = FreqTable.two_sample_pvals_loc(cnt1, cnt0,
-                 randomize=self._randomize, min_cnt=self._min_cnt,
-                 pval_type=self._pval_type)
+            pv = FreqTable.two_sample_pvals_loc(cnt1, cnt0, **kwargs)
         return pv 
 
     def __get_counts(self, dtbl, within=False) :
@@ -273,11 +285,12 @@ class FreqTable(object):
         gamma = kwargs.get('gamma', self._gamma)
         within = kwargs.get('within', False)
         min_cnt = kwargs.get('min_cnt', self._min_cnt)
-        pvals_type = kwargs.get('pvals', 'binomial allocation')
+        pvals_type = kwargs.get('pvals', self._pval_type)
 
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         
-        if pvals_type == 'binomial variance' :
+        if pvals_type == 'stripes' :
+            logging.debug('Computing stripes P-values.')
             df = pd.DataFrame(binom_var_test(cnt0, cnt1) )
 
         else :

@@ -39,7 +39,7 @@ class AuthorshipAttributionMulti(object):
         #self._min_cnt = min_cnt
 
         self._vocab = vocab
-        if self._vocab is None : #get vocabulary unless supplied
+        if (self._vocab is None) or (self._vocab == []) : #get vocabulary unless supplied
             self._get_vocab(data, **kwargs)
 
         #compute FreqTable for each author
@@ -104,7 +104,7 @@ class AuthorshipAttributionMulti(object):
                     column_labels=self._vocab,
                     row_labels=document_names,
                     stbl=kwargs.get('stbl',True),
-                    randomize=kwargs.get('randomize',False),
+                    randomize=kwargs.get('randomize', False),
                     gamma=kwargs.get('gamma', 0.25),
                     pval_thresh=kwargs.get('pval_thresh',1.1),
                     min_cnt=kwargs.get('min_cnt', 3),
@@ -668,7 +668,7 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
                     column_labels=fn,
                     row_labels=dn,
                     stbl=kwargs.get('stbl', True),
-                    randomize=kwargs.get('randomize',False),
+                    randomize=kwargs.get('randomize', False),
                     gamma=kwargs.get('gamma', 0.25),
                     pval_thresh=kwargs.get('pval_thresh',1.1),
                     min_cnt=kwargs.get('min_cnt', 3),
@@ -700,15 +700,13 @@ class AuthorshipAttributionMultiBinary(object):
         self._stbl = stbl
         self._randomize = randomize
 
-        if len(vocab) == 0 :
-            if global_vocab == True:
-                if len(vocab) == 0:
-                    #get top vocab_size terms
-                    vocab = n_most_frequent_words(
-                                    list(data.text),
-                                    n=vocab_size,
-                                    words_to_ignore=words_to_ignore,
-                                    ngram_range=ngram_range)
+        if (len(vocab) == 0) and global_vocab :
+            #get top vocab_size terms
+            vocab = n_most_frequent_words(
+                            list(data.text),
+                            n=vocab_size,
+                            words_to_ignore=words_to_ignore,
+                            ngram_range=ngram_range)
             
         lo_authors = pd.unique(data.author)  #all authors
         lo_author_pairs = [(auth1, auth2) for auth1 in lo_authors\
@@ -739,7 +737,7 @@ class AuthorshipAttributionMultiBinary(object):
     def reduce_features_for_author_pair(self, auth_pair) :
         """
             Find list of features (tokens) discriminating two authors
-            Reduce model to those features. 
+            and reduce model to those features. 
             'auth_pair' is a key in self._AuthorPairModel
             returns the new list of features
         """
@@ -788,4 +786,9 @@ class AuthorshipAttributionMultiBinary(object):
                 },
                 ignore_index=True)
         return df
+
+    def two_author_test(self, auth1, auth2, **kwargs) :
+        md = self._AuthorPairModel[(auth1, auth2)]
+        return md.two_author_test(auth1, auth2, **kwargs)
+
 

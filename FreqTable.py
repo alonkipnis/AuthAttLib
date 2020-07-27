@@ -289,7 +289,7 @@ class FreqTable(object):
 
         """
         stbl = kwargs.get('stbl', self._stbl)
-        randomize = kwargs.get('randomize', self._stbl)
+        randomize = kwargs.get('randomize', self._randomize)
         gamma = kwargs.get('gamma', self._gamma)
         within = kwargs.get('within', False)
         min_cnt = kwargs.get('min_cnt', self._min_cnt)

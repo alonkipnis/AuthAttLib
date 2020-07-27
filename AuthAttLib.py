@@ -5,7 +5,10 @@ from .utils import to_docTermCounts,\
  n_most_frequent_words, extract_ngrams
 from .FreqTable import FreqTable
 import warnings
-            
+
+import logging
+
+
 class AuthorshipAttributionMulti(object):
     """
     A class to measure similarity of documents to multiple authors, 
@@ -61,6 +64,8 @@ class AuthorshipAttributionMulti(object):
             if self._verbose :
                 print("\t Creating author-model for {} using {} features..."\
                     .format(auth, len(self._vocab)), end =" ")
+            logging.info("Creating author-model for {} using {} features..."\
+                    .format(auth, len(self._vocab)))
 
             self._AuthorModel[auth] = self._to_docTermTable(
                                 list(data_auth.text),
@@ -71,6 +76,9 @@ class AuthorshipAttributionMulti(object):
                 print("\t\tfound {} documents and {} relevant tokens."\
             .format(len(data_auth),
                 self._AuthorModel[auth]._counts.sum()))
+            logging.info(("\t\tfound {} documents and {} relevant tokens."\
+            .format(len(data_auth),
+                self._AuthorModel[auth]._counts.sum())))
 
 
     def _to_docTermTable(self, X, document_names=[], **kwargs):
@@ -78,13 +86,11 @@ class AuthorshipAttributionMulti(object):
 
         Override this fucntion to process other input format. 
 
-
         Args:     
         ------
             X                 list of texts 
             document_names    list of strings representing the names
                               of each text in X
-
         Returs:
         -------
             FreqTable object
@@ -102,7 +108,7 @@ class AuthorshipAttributionMulti(object):
                     gamma=kwargs.get('gamma', 0.25),
                     pval_thresh=kwargs.get('pval_thresh',1.1),
                     min_cnt=kwargs.get('min_cnt', 3),
-                    pval_type=kwargs.get('pval_type', 'both')
+                    pval_type=kwargs.get('pval_type', 'cell')
                     )
 
     def _recompute_author_models(self):
@@ -113,6 +119,8 @@ class AuthorshipAttributionMulti(object):
             am.change_vocabulary(self._vocab)
             if self._verbose :
                 print("Changing vocabulary for {}. Found {} relevant tokens."\
+                    .format(auth, am._counts.sum()))
+            logging.info("Changing vocabulary for {}. Found {} relevant tokens."\
                     .format(auth, am._counts.sum()))
 
     def predict(self, x, method='HC',
@@ -224,8 +232,8 @@ class AuthorshipAttributionMulti(object):
                         ignore_index=True)
         return df
 
-    def get_doc_stats(self, doc_id, author,
-     wrt_authors = [], LOO = False) :
+    def get_doc_stats(self, doc_id, author, 
+                      wrt_authors = [], LOO = False) :
         """ 
         document statistics wrt to all authors in list wrt_authors of 
         a single document within the model. 
@@ -331,7 +339,6 @@ class AuthorshipAttributionMulti(object):
 
         df = pd.DataFrame()
 
-
         authors = kwargs.get('authors', self._AuthorModel)
         wrt_authors = kwargs.get('wrt_authors', self._AuthorModel)
         LOO = kwargs.get('LOO', False)
@@ -344,11 +351,13 @@ class AuthorshipAttributionMulti(object):
             #    md1 = self._AuthorModel[auth1]
             lo_docs = md0.get_row_labels()
             for dn in lo_docs:
+                logging.info("testing {} by {}".format(dn,auth0))
                 if verbose :
                     print("testing {} by {}".format(dn,auth0))
+                logging.info("testing {} by {}".format(dn,auth0))
                 df = df.append(self.get_doc_stats(dn, auth0,
-                        wrt_authors = wrt_authors,
-                        LOO = LOO), ignore_index=True)
+                        wrt_authors = wrt_authors, LOO = LOO),
+                        ignore_index=True)
 
         self._inter_similarity = df
         return self._inter_similarity
@@ -406,6 +415,7 @@ class AuthorshipAttributionMulti(object):
             for dn in lo_docs:
                 if verbose :
                     print("testing {} by {}".format(dn,auth0))
+                logging.info("testing {} by {}".format(dn,auth0))
                 df = df.append(self.get_doc_stats(dn, auth0,
                  wrt_authors = wrt_authors,
                   LOO = LOO), ignore_index=True)
@@ -518,30 +528,24 @@ class AuthorshipAttributionMulti(object):
                     ignore_index=True)
         return df
 
-    def two_author_test(self, auth1, auth2, 
-        stbl=None, within=False, randomize=False) :
+    def two_author_test(self, auth1, auth2, within=False, **kwargs) :
         return self._AuthorModel[auth1]\
                   .two_table_HC_test(self._AuthorModel[auth2],
-                   stbl=stbl,
-                   within=within,
-                   randomize=randomize
-                   )
+                   within=within, **kwargs)
 
     def two_doc_test(self, auth_doc_pair1, auth_doc_pair2, **kwargs) :
         """ Test two documents/corpora against each other.
 
         Args:
         -----
-        auth_doc_pairx   (tuple) first coordinate represents the corpus name and 
-                                second coorindate represents the document name.
-                                If document name is None, all corpus is used. 
-                                If testing a corpus agains a dcoument of that 
-                                corpus, pass 
-            auth_doc_pair1 = (<corpus_name>, None)
-            auth_doc_pair1 = (<corpus_name>, <doc_id>)
-
+        auth_doc_pairx  (tuple) first coordinate represents the corpus
+                        name and second coorindate represents the document
+                        name. If document name is None, entire corpus is used. 
+                        For testing a corpus agains a dcoument of that 
+                        corpus use:
+                        auth_doc_pair1 = (<corpus_name>, None)
+                        auth_doc_pair2 = (<corpus_name>, <doc_id>)
         """
-        stbl = kwargs.get('stbl', True)
 
         if auth_doc_pair1[1] == None :
             md1 = self._AuthorModel[auth_doc_pair1[0]]
@@ -557,13 +561,9 @@ class AuthorshipAttributionMulti(object):
         
         if auth_doc_pair1[0] == auth_doc_pair2[0] :
             if auth_doc_pair1[1] == None:
-                return md1.two_table_HC_test(md2,
-                       stbl=stbl,
-                       within=True)            
+                return md1.two_table_HC_test(md2, within=True, **kwargs)            
             
-        return md1.two_table_HC_test(md2,
-                   stbl=stbl,
-                   within=False)
+        return md1.two_table_HC_test(md2, within=False, **kwargs)
 
     def reduce_features(self, new_feature_set):
         """
@@ -621,6 +621,7 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
             if self._verbose :
                 print("\t Creating author-model for {}...".format(auth), 
                     end =" ")
+            logging.info("Creating author-model for {}...".format(auth))
             
             dtm = self._to_docTermTable(ds_auth, **kwargs)
             dtm.change_vocabulary(new_vocabulary=self._vocab)
@@ -629,7 +630,10 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
                 print("Done.")
                 print("\t\tfound {} documents and {} relevant tokens."\
                 .format(len(self._AuthorModel[auth].get_row_labels()),
-                    self._AuthorModel[auth]._counts.sum()))    
+                    self._AuthorModel[auth]._counts.sum()))
+            logging.info("Found {} documents and {} relevant tokens."\
+                .format(len(self._AuthorModel[auth].get_row_labels()),
+                    self._AuthorModel[auth]._counts.sum()))
     
 
     def _to_docTermTable(self, df, **kwargs):
@@ -663,12 +667,12 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
         dtm = FreqTable(mat,
                     column_labels=fn,
                     row_labels=dn,
-                    stbl=kwargs.get('stbl',True),
+                    stbl=kwargs.get('stbl', True),
                     randomize=kwargs.get('randomize',False),
                     gamma=kwargs.get('gamma', 0.25),
                     pval_thresh=kwargs.get('pval_thresh',1.1),
                     min_cnt=kwargs.get('min_cnt', 3),
-                    pval_type=kwargs.get('pval_type', 'both')
+                    pval_type=kwargs.get('pval_type', 'cell')
                     )
         return dtm
 

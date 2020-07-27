@@ -7,13 +7,12 @@ from sklearn.neighbors import NearestNeighbors
 import sys
 #sys.path.append('./TwoSampleHC')
 from .TwoSampleHC import HC, binom_test_two_sided,\
-         two_sample_pvals, two_sample_test_df, binom_var_test
+         two_sample_pvals, two_sample_test_df, binom_var_test, binom_var_test_df
 from .goodness_of_fit_tests import *
 
 import logging
-logging.basicConfig(level=logging.WARNING)
 
-    
+
 #To do :
 # complete class MultiTable
 
@@ -40,7 +39,7 @@ class FreqTable(object):
 
     def __init__(self, dtm, column_labels=[], row_labels=[],
         min_cnt=0, stbl=True, gamma=0.25, randomize=False,
-         pval_thresh=1.1, pval_type='both', max_m=-1) :
+         pval_thresh=1.1, pval_type='cell', max_m=-1) :
         
         if len(row_labels) < dtm.shape[0] :
             row_labels = ["smp" + str(i) for i in range(dtm.shape[0])]
@@ -77,16 +76,18 @@ class FreqTable(object):
 
     @staticmethod     
     def two_sample_pvals_loc(c1, c2, randomize=False,
-                         min_cnt=0, pval_type='both',
-                         max_m=-1) :
-        if pval_type == 'stripes' :
-            logging.debug('Computing per-stripe P-values.')
+                         min_cnt=0, pval_type='cell', max_m=-1
+                            ) :
+
+        if pval_type == 'stripe' :
+            logging.debug('Computing stripe P-values.')
             return binom_var_test(c1, c2, max_m=max_m).values
+
         if pval_type == 'cell' :
-            logging.debug('Computing per-cell P-values.')
+            logging.debug('Computing cell P-values.')
             return two_sample_pvals(c1, c2, randomize=randomize)
 
-        logging.debug('Using both P-values types.')
+        logging.debug('Computing cell and stripe P-values.')
         pv_bin_var = binom_var_test(c1, c2).values
         pv_exact = two_sample_pvals(c1, c2, randomize=randomize)
         pv_exact = pv_exact[c1 + c2 >= min_cnt]
@@ -129,7 +130,6 @@ class FreqTable(object):
                     .squeeze().astype(int)
         
         self._internal_scores = []
-
         
         self._internal_scores = self._per_row_similarity_LOO(
             self.row_similarity)
@@ -138,25 +138,32 @@ class FreqTable(object):
     def __compute_HC(self, pvals) :
         np.warnings.filterwarnings('ignore') # when more than one pval is 
         # np.nan numpy show a warning. The current code supress this warning
-        pv = pvals[pvals < self._pval_thresh]
-        pv = pv[~np.isnan(pv)]
+        pv = pvals[~np.isnan(pvals)]
+        pv = pv[pv < self._pval_thresh]
+
         np.warnings.filterwarnings('always')
         if len(pv) > 0 :
             hc = HC(pv, stbl=self._stbl)
             return hc.HCstar(gamma=self._gamma)
         else :
+            logging.debug("Did not find non nan P-values.")
             return np.nan, np.nan
         #return hc_vals(pv, stbl=self._stbl,
         #     gamma=self._gamma)
 
     def get_column_labels(self):
-        "returns name of each column in table"
+        """
+        Returns name of each column in table
+        """
+
         return self._column_labels
 
     def get_featureset(self) :
         """
         Returns a dictionary with keys = column_labels 
-        and values = total count per column """
+        and values = total count per column 
+        """
+
         return dict(zip(self._column_labels,
             np.squeeze(np.array(self._counts))))
 
@@ -248,13 +255,14 @@ class FreqTable(object):
         return cnt0, cnt1
 
     def get_Pvals(self, dtbl, within=False):
-        """ return a list of binomial allocation 
-            p-values of another FreqTable 'dtbl' with 
-            respect to doc-term table of class instance.
+        """ return a list of p-values with respect to a second 
+            FreqTable 'dtbl'.
 
         Args: 
-            dtbl -- FreqTable object 
+        -----
+        dtbl    FreqTable object 
         """
+
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         pv = FreqTable.two_sample_pvals_loc(cnt1, cnt0,
                  randomize=self._randomize, min_cnt=self._min_cnt,
@@ -285,15 +293,17 @@ class FreqTable(object):
         gamma = kwargs.get('gamma', self._gamma)
         within = kwargs.get('within', False)
         min_cnt = kwargs.get('min_cnt', self._min_cnt)
-        pvals_type = kwargs.get('pvals', self._pval_type)
+        pval_type = kwargs.get('pval_type', self._pval_type)
+        max_m = pvals_type = kwargs.get('max_m', -1)
 
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         
-        if pvals_type == 'stripes' :
-            logging.debug('Computing stripes P-values.')
-            df = pd.DataFrame(binom_var_test(cnt0, cnt1) )
+        if pval_type == 'stripe' :
+            logging.debug('Computing stripe P-values.')
+            df = binom_var_test_df(cnt0, cnt1, max_m=max_m)
 
         else :
+            logging.debug('Computing cell P-values.')
             df = two_sample_test_df(cnt0, cnt1,
                  stbl=stbl,
                 randomize=randomize,
@@ -543,14 +553,17 @@ class FreqTable(object):
         return cosine_sim(cnt0, cnt1)
 
     def get_HC(self, dtbl, within=False):
-        """ returns the HC score of dtm1 wrt to doc-term table,
+        """ 
+        Returns the HC score of dtm1 wrt to doc-term table,
         as well as its rank among internal scores 
         Args:
-            stbl -- indicates type of HC statistic
-            within -- indicate whether tested table is included in current 
-                    FreqTable object. if within==True then tested _count
-                    are subtracted from FreqTable._dtm
+        -----
+        stbl      indicates type of HC statistic
+        within    indicate whether tested table is included in current 
+                  FreqTable object. if within==True then tested _count
+                  are subtracted from FreqTable._dtm
          """
+
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         pvals = FreqTable.two_sample_pvals_loc(cnt0, cnt1, 
             randomize=self._randomize, min_cnt=self._min_cnt,

@@ -146,17 +146,13 @@ def frequent_words_tfidf(
     return vocab_tfidf[-no_words:]
 
 
-def term_counts(text, vocab=[], symbols=[]):
+def term_counts(text, vocab=[]):
     """return a dataframe of the form feature|n representing 
         counts of terms in text and symbols in text. 
         If vocab = [] use all words in text as the vocabulary.
     """
 
     df = pd.DataFrame()
-
-    for ch in symbols:
-        n1 = len(re.findall(ch, text))
-        df = df.append({'feature': ch, 'n': n1}, ignore_index=True)
 
     pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
     # term counts

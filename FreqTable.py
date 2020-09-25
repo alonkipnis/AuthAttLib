@@ -7,7 +7,8 @@ from sklearn.neighbors import NearestNeighbors
 import sys
 #sys.path.append('./TwoSampleHC')
 from .TwoSampleHC import HC, binom_test_two_sided,\
-         two_sample_pvals, two_sample_test_df, binom_var_test, binom_var_test_df
+         two_sample_pvals, two_sample_test_df,\
+         binom_var_test, binom_var_test_df
 from .goodness_of_fit_tests import *
 
 import logging
@@ -85,7 +86,8 @@ class FreqTable(object):
 
         if pval_type == 'cell' :
             logging.debug('Computing cell P-values.')
-            return two_sample_pvals(c1, c2, randomize=randomize)
+            pv_exact = two_sample_pvals(c1, c2, randomize=randomize)
+            return pv_exact[c1 + c2 >= min_cnt]
 
         logging.debug('Computing cell and stripe P-values.')
         pv_bin_var = binom_var_test(c1, c2).values
@@ -116,9 +118,8 @@ class FreqTable(object):
             return mat[r,:]
 
     def row_similarity(self, c1, c2) :
-        hc = HC_sim(c1, c2, gamma=self._gamma, 
-                randomize=self._randomize,
-                pval_thresh=self._pval_thresh)
+        hc = HC_sim(c1, c2, gamma=self._gamma, randomize=self._randomize,
+                         pval_thresh=self._pval_thresh)
         return hc
 
     def __compute_internal_stat(self, compute_pvals=True):
@@ -133,11 +134,11 @@ class FreqTable(object):
         
         self._internal_scores = self._per_row_similarity_LOO(
             self.row_similarity)
-    
 
     def __compute_HC(self, pvals) :
-        np.warnings.filterwarnings('ignore') # when more than one pval is 
-        # np.nan numpy show a warning. The current code supress this warning
+        np.warnings.filterwarnings('ignore') # numpy puts a warning 
+        # when more than one pval is np.nan 
+        # This like supresses this warning
         pv = pvals[~np.isnan(pvals)]
         pv = pv[pv < self._pval_thresh]
 
@@ -146,22 +147,21 @@ class FreqTable(object):
             hc = HC(pv, stbl=self._stbl)
             return hc.HCstar(gamma=self._gamma)
         else :
-            logging.debug("Did not find non nan P-values.")
+            logging.warning("Did not find any P-values.")
             return np.nan, np.nan
         #return hc_vals(pv, stbl=self._stbl,
         #     gamma=self._gamma)
 
     def get_column_labels(self):
-        """
-        Returns name of each column in table
-        """
-
         return self._column_labels
+
+    def get_row_labels(self):
+        return self._row_labels
 
     def get_featureset(self) :
         """
-        Returns a dictionary with keys = column_labels 
-        and values = total count per column 
+        Returns a dictionary with: keys = column labels 
+                                 values = total count per column 
         """
 
         return dict(zip(self._column_labels,
@@ -181,10 +181,6 @@ class FreqTable(object):
             #get counts from a single line
             ls += [dict(zip(self._column_labels,counts))]
         return ls
-
-    def get_row_labels(self):
-        "returns id of each row in table"
-        return self._row_labels
 
     def _Pvals_from_counts(self, counts, within=False):
         """ Returns pvals from a list counts 
@@ -316,6 +312,29 @@ class FreqTable(object):
             except :
                 df.loc[:,'feature'] = [lbls]
         return df
+
+    def internal_feature_test(self) :
+        df = pd.DataFrame(self._dtm.todense(), 
+                     columns = self.get_column_labels(),
+                     index = self.get_row_labels()
+                    )
+
+        feat_rec = pd.DataFrame({'n' : df.sum(), 'cnt' : 0}, 
+                                index = self.get_column_labels())
+
+        for r in df.iterrows() :
+            m1 = r[1]
+            m2 = df.sum() - m1
+            res = two_sample_test_df(m1, m2, gamma = self._gamma)
+            feat_rec.loc[res[res.thresh].index, 'cnt'] += 1
+
+        return feat_rec
+
+    def to_Pandas(self) :
+        return pd.DataFrame(self._dtm.todense(), 
+                     columns = self.get_column_labels(),
+                     index = self.get_row_labels()
+                    )        
 
     def change_vocabulary(self, new_vocabulary):
         """ Shift and remove columns of self._dtm so that it 
@@ -457,7 +476,6 @@ class FreqTable(object):
                             randomize=self._randomize, stbl=self._stbl)
         return new_table
 
-
     def copy(self) : 
         # create a copy of FreqTable instance
         new_table = FreqTable(
@@ -568,7 +586,6 @@ class FreqTable(object):
         pvals = FreqTable.two_sample_pvals_loc(cnt0, cnt1, 
             randomize=self._randomize, min_cnt=self._min_cnt,
             pval_type=self._pval_type)
-        #pvals = self.get_Pvals(dtbl, within=within)
         HC, p_thr = self.__compute_HC(pvals)
 
         return HC
@@ -669,11 +686,10 @@ class FreqTable(object):
         return HC, rank, feat
 
 
-
 class FreqTableClassifier(NearestNeighbors) :
     """ nearset neighbor classifcation for frequency tables 
         TODO: 
-         - implement SVD or LDA classifier based on one of the 
+         - SVD or LDA classifier based on one of the 
            metrics
 
     """
@@ -683,7 +699,7 @@ class FreqTableClassifier(NearestNeighbors) :
         Parameters:
         -----------
         metric : string -- what similarity measure to use
-        **kwargs : argument to FreqTable
+        kwargs : argument to FreqTable
         """
         
         self._inf = 1e6
@@ -793,7 +809,9 @@ class FreqTableClassifier(NearestNeighbors) :
 
 
     def predict(self, X) :
-        """Predict the class labels for the provided data.
+        """
+        Predict class labels of input X.
+
         Parameters
         ----------
         X : array of FreqTable objects, shape (n_queries), 

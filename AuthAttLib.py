@@ -4,7 +4,9 @@ from tqdm import *
 from .utils import to_docTermCounts,\
  n_most_frequent_words, extract_ngrams
 from .FreqTable import FreqTable
+from sklearn.model_selection import train_test_split
 import warnings
+import scipy
 
 import logging
 
@@ -122,70 +124,6 @@ class AuthorshipAttributionMulti(object):
                     .format(auth, am._counts.sum()))
             logging.info("Changing vocabulary for {}. Found {} relevant tokens."\
                     .format(auth, am._counts.sum()))
-
-    def predict(self, x, method='HC',
-                unk_thresh=1e6, LOO=False):
-        """
-        Attribute text x with one of the authors or '<UNK>'. 
-
-        Args:
-        -----
-            x           string representing the test document 
-            method      designate which score to use. Supported method:
-                        'HC', 'HC_rank', 'chisq', 'chisq_pval', 'cosine'
-            unk_thresh  minimal score below which the text is 
-                        attributed to one of the authors in the model and not 
-                        assigned the label '<UNK>'.
-            LOO         indicates whether to compute rank in a leave-of-out mode
-                        it leads to more accurate rank-based testing but require
-                        more computations. 
-
-        Returns:
-        --------
-            pred        one of the keys in self._AuthorModel or '<UNK>'
-            marg        ratio of second smallest score to smallest scroe
-
-        Note:
-            Currently methods 'HC', 'rank' and 'cosine'
-            are supported. 
-        """
-
-        if len(self._AuthorModel) == 0:
-            raise IndexError("no pre-trained author models found")
-            return None
-
-        cand = '<UNK>'
-        min_score = unk_thresh
-        margin = unk_thresh
-
-        Xdtb = self._to_docTermTable([x])
-
-        for i, auth in enumerate(self._AuthorModel):
-            am = self._AuthorModel[auth]
-            
-            if method == 'HC' :
-                HC = am.get_HC(Xdtb)
-                score = HC
-            elif method == 'HC_rank' :
-                rank = am.get_rank(Xdtb, LOO=LOO)
-                score = rank
-            elif method == 'cosine':
-                cosine = am.get_CosineSim(Xdtb)
-                score = cosine
-            elif method == 'chisq' or method == 'chisq_pval' :
-                chisq, chisq_pval, chisq_rank = am.get_ChiSquare(Xdtb)
-                if method == 'chisq' :
-                    score = chisq
-                else :
-                    score = 1 - chisq_pval
-
-            if score < min_score: # find new minimum
-                margin = min_score / score
-                min_score = score
-                cand = auth
-            elif score / min_score < margin : # make sure to track the margin
-                margin = score / min_score
-        return cand, margin
 
     def internal_stats_corpus(self):
         """Compute scores of each pair of corpora within the model.
@@ -323,6 +261,7 @@ class AuthorshipAttributionMulti(object):
         is removed from that corpus. 
         
         Args:
+        -----
         authors -- subset of the authors in the model. Test only documents
                 belonging to these authors
         wrt_authors -- subset of the authors in the model with respect
@@ -572,21 +511,87 @@ class AuthorshipAttributionMulti(object):
         self._vocab = new_feature_set
         self._recompute_author_models()
 
-    def train_classifyer(self, classifyer) :
+    def get_data_labels(self, cls) :
+        dtm = self._AuthorModel[cls]._dtm
+        n, _ = dtm.shape
+        return dtm, [cls] * n
+
+    def check_classifier(self, classifier, split=0.75) :
+        # get data and labels:
+        y = []
+        X = []
+        for cls in self._AuthorModel :
+            X1, y1 = self.get_data_labels(cls)
+            X = scipy.sparse.vstack([X, X1])
+            y += y1
+        X = X.tocsr()[1:]
+
+        X_train, X_test,y_train, y_test = train_test_split(
+                                X, y, test_size=1-split)
+        classifier.fit(X_train, y_train)
+        return classifier.score(X_test, y_test)
+
+
+class CheckClassifier(object) :
+    """
+    Check performance of a classifier operating on an 
+    AuthorshipAttributionMulti model
+    =================================================
+
+    Args:
+    -----
+    classifier     has methods fit and score
+    model          AuthorshipAttributionMulti
+    nMonte         number of checks
+    split          train/test split 
+    """
+    
+    def __init__(self, classifier, model, nMonte=1,
+                 split=0.75) :
+        
+        self.classifier = classifier
+        self.model = model
+        
+        acc = []
+        X, y = self.get_data_labels()
+        
+        for i in tqdm(range(nMonte)) :
+            X_train, X_test,y_train, y_test = train_test_split(
+                                    X, y, test_size=1-split)
+            self.fit(X_train, y_train)
+            acc += [self.evaluate(X_test, y_test)]
+            
+        self.acc = acc
+            
+    def get_data_labels(self) :
+        
+        def dic_to_values(X) :
+            return [list(x.values()) for x in X]
+
         def dtm_to_featureset(dtm) :
             fs = []
             for sm_id in dtm.get_row_labels() :
                 dtl = dtm.get_row_as_FreqTable(sm_id)
                 fs += [dtl.get_featureset()]
             return fs
+        
+        ds = []
+        for auth in self.model._AuthorModel :
+            mdd =  self.model._AuthorModel[auth]
+            fs = dtm_to_featureset(mdd)
+            ds += [(f, auth) for f in fs]
+            
+        ls = list(zip(*ds))
+        X = dic_to_values(ls[0])
+        y = ls[1]
+        return X, y
 
-        train_set = []
-        for auth in self._AuthorModel :
-                md =  self._AuthorModel[auth]
-                fs = dtm_to_featureset(md)
-                train_set += [(f, auth) for f in fs]
+    def fit(self, X, y) :
+        self.classifier.fit(X, y)
+    
+    def evaluate(self, X, y) :
+        return self.classifier.score(X, y)
 
-        classifyer.train(train_set)
 
 
 class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
@@ -618,19 +623,12 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
         lo_authors = pd.unique(ds.author)
         for auth in lo_authors:
             ds_auth = ds[ds.author == auth]
-            if self._verbose :
-                print("\t Creating author-model for {}...".format(auth), 
-                    end =" ")
             logging.info("Creating author-model for {}...".format(auth))
             
             dtm = self._to_docTermTable(ds_auth, **kwargs)
             dtm.change_vocabulary(new_vocabulary=self._vocab)
             self._AuthorModel[auth] = dtm
-            if self._verbose :
-                print("Done.")
-                print("\t\tfound {} documents and {} relevant tokens."\
-                .format(len(self._AuthorModel[auth].get_row_labels()),
-                    self._AuthorModel[auth]._counts.sum()))
+            
             logging.info("Found {} documents and {} relevant tokens."\
                 .format(len(self._AuthorModel[auth].get_row_labels()),
                     self._AuthorModel[auth]._counts.sum()))
@@ -675,6 +673,8 @@ class AuthorshipAttributionDTM(AuthorshipAttributionMulti) :
                     pval_type=kwargs.get('pval_type', 'cell')
                     )
         return dtm
+
+
 
 
 class AuthorshipAttributionMultiBinary(object):

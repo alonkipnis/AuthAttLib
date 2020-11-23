@@ -161,6 +161,7 @@ def term_counts(text, vocab=[]):
     else:
         tf_vectorizer = CountVectorizer(token_pattern=pat, vocabulary=vocab)
     tf = tf_vectorizer.fit_transform([text])
+    vocab = tf_vectorizer.get_feature_names()
     tc = np.array(tf.sum(0))[0]
 
     df = pd.concat([df, pd.DataFrame({'feature': vocab, 'n': tc})])

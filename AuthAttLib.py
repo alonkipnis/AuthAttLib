@@ -170,8 +170,7 @@ class AuthorshipAttributionMulti(object):
                         ignore_index=True)
         return df
 
-    def get_doc_stats(self, doc_id, author, 
-                      wrt_authors = [], LOO = False) :
+    def get_doc_stats(self, doc_id, author, wrt_authors = [], LOO = False) :
         """ 
         document statistics wrt to all authors in list wrt_authors of 
         a single document within the model. 
@@ -290,10 +289,7 @@ class AuthorshipAttributionMulti(object):
             #    md1 = self._AuthorModel[auth1]
             lo_docs = md0.get_row_labels()
             for dn in lo_docs:
-                logging.info("testing {} by {}".format(dn,auth0))
-                if verbose :
-                    print("testing {} by {}".format(dn,auth0))
-                logging.info("testing {} by {}".format(dn,auth0))
+                logging.info(f"testing {dn} by {auth0} against all corpora.")
                 df = df.append(self.get_doc_stats(dn, auth0,
                         wrt_authors = wrt_authors, LOO = LOO),
                         ignore_index=True)

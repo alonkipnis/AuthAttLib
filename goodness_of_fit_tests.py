@@ -1,4 +1,4 @@
-from scipy.stats import chi2_contingency, ks_2samp, norm
+from scipy.stats import chi2_contingency, norm
 from scipy.spatial.distance import cosine
 
 from .TwoSampleHC import two_sample_pvals, HC
@@ -102,11 +102,6 @@ def two_sample_chi_square(c1, c2, lambda_="pearson"):
             Lpval = np.log(pval)
         return chisq / dof, Lpval
         
-
-def two_sample_KS(s1, s2) :
-    """ 2-sample Kolmogorov-Smirnov test
-    """
-    return ks_2samp(s1, s2)
 
 def cosine_sim(c1, c2):
     """

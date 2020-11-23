@@ -4,6 +4,7 @@ import pandas as pd
 import warnings
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import scipy
+from .TwoSampleHC import HC
 
 LIST_OF_COLORS = ['tab:red', 'tab:blue','tab:gray', "#00BA38", 
     'tab:olive', "#619CFF", 'tab:orange', "#F8766D",
@@ -12,6 +13,19 @@ LIST_OF_COLORS = ['tab:red', 'tab:blue','tab:gray', "#00BA38",
     'cyan', 'navy'
     'magenta', '#595959', 'lightseagreen', 'orangered', 'crimson'
 ]
+
+
+def visualize_HCT(pvals, stbl=True, gamma=.3) :
+    hc = HC(pvals, stbl=stbl)
+    hc.HCstar(gamma=gamma)
+    
+    n_max = min(int(5 * hc._istar), hc._N) 
+    
+    plt.plot(hc._uu[:n_max], hc._zz[:n_max])
+    plt.vlines(x=hc._uu[hc._istar], ymin=0, ymax=max(hc._zz[:n_max]),
+               linestyles='dashed', color='red')
+    plt.show()
+
 
 def plot_author_pair(df, value = 'HC', wrt_authors = [],
                      show_legend=True):

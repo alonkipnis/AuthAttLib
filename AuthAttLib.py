@@ -63,9 +63,6 @@ class AuthorshipAttributionMulti(object):
         lo_authors = pd.unique(data.author)
         for auth in lo_authors:
             data_auth = data[data.author == auth]
-            if self._verbose :
-                print("\t Creating author-model for {} using {} features..."\
-                    .format(auth, len(self._vocab)), end =" ")
             logging.info("Creating author-model for {} using {} features..."\
                     .format(auth, len(self._vocab)))
 
@@ -73,11 +70,7 @@ class AuthorshipAttributionMulti(object):
                                 list(data_auth.text),
                                 document_names=list(data_auth.doc_id),
                                 **kwargs)
-            if self._verbose :
-                print("Done.")
-                print("\t\tfound {} documents and {} relevant tokens."\
-            .format(len(data_auth),
-                self._AuthorModel[auth]._counts.sum()))
+            
             logging.info(("\t\tfound {} documents and {} relevant tokens."\
             .format(len(data_auth),
                 self._AuthorModel[auth]._counts.sum())))
@@ -105,7 +98,7 @@ class AuthorshipAttributionMulti(object):
         return FreqTable(dtm,
                     column_labels=self._vocab,
                     row_labels=document_names,
-                    stbl=kwargs.get('stbl',True),
+                    stbl=kwargs.get('stbl', True),
                     randomize=kwargs.get('randomize', False),
                     gamma=kwargs.get('gamma', 0.25),
                     pval_thresh=kwargs.get('pval_thresh',1.1),
@@ -170,6 +163,37 @@ class AuthorshipAttributionMulti(object):
                         ignore_index=True)
         return df
 
+    def test_doc_pval(self, doc_id, author, wrt_authors = []) :
+        try :
+            md0 = self._AuthorModel[author]
+            lo_docs = md0.get_row_labels()
+            i = lo_docs[doc_id]
+            dtbl = md0.get_row_as_FreqTable(doc_id)
+        except ValueError:
+            logging.error("Document {} by author {}".format(doc_id,author)\
+                +" has empty set of features.")
+            return None
+
+        if wrt_authors == [] :
+            wrt_authors = self._AuthorModel.keys()
+
+        df = pd.DataFrame()
+        df['n'] = dtbl._counts
+        df['feature'] = dtbl.get_column_labels()
+        for auth1 in wrt_authors:
+            md1 = self._AuthorModel[auth1]                
+            if author == auth1:
+                df1 = md1.two_table_HC_test(dtbl, within=True)
+            else:
+                df1 = md1.two_table_HC_test(dtbl, within=False)
+            
+            df[f'n({auth1})'] = df1.n1
+            df[f'pval({auth1})'] = df1.pval
+            df[f'sign({auth1})'] = np.sign(df1.n1 - (df1.n2 + df1.n1) * df1.p)
+
+        return df
+
+
     def get_doc_stats(self, doc_id, author, wrt_authors = [], LOO = False) :
         """ 
         document statistics wrt to all authors in list wrt_authors of 
@@ -216,6 +240,7 @@ class AuthorshipAttributionMulti(object):
                     lambda_="log-likelihood",
                     LOO_rank=LOO
                     )
+                F = md1.get_FisherComb(dtbl, within=True)
 
                 cosine = md1.get_CosineSim(dtbl, within=True)
             else:
@@ -233,6 +258,7 @@ class AuthorshipAttributionMulti(object):
                     dtbl,
                     lambda_="log-likelihood", LOO_rank=LOO)
                 
+                F = md1.get_FisherComb(dtbl, within=False)
                 #bj = md1.get_BJSim(dtbl)
                 cosine = md1.get_CosineSim(dtbl)
             df = df.append(
@@ -241,6 +267,7 @@ class AuthorshipAttributionMulti(object):
                     'author': author,
                     'wrt_author': auth1,
                     'HC': HC,
+                    'Fisher' : F,
                     #'BJ' : bj,
                     'chisq': chisq,
                     'chisq_rank' : chisq_rank,
@@ -279,7 +306,7 @@ class AuthorshipAttributionMulti(object):
 
         authors = kwargs.get('authors', self._AuthorModel)
         wrt_authors = kwargs.get('wrt_authors', self._AuthorModel)
-        LOO = kwargs.get('LOO', False)
+        LOO = kwargs.get('LOO', True)
         verbose = kwargs.get('verbose', False)
         
         for auth0 in authors :
@@ -297,8 +324,7 @@ class AuthorshipAttributionMulti(object):
         self._inter_similarity = df
         return self._inter_similarity
 
-    def get_inter_similarity(self) :
-        return self._inter_similarity
+
 
     def internal_stats(self, authors = [], wrt_authors=[], 
             LOO=False, verbose=False):
@@ -448,12 +474,14 @@ class AuthorshipAttributionMulti(object):
                 cosine = md0.get_CosineSim(dtbl)
                 HC = md0.get_HC(dtbl)
                 rank = md0.get_rank(dtbl, LOO=LOO)
+                F = md0.get_FisherComb(dtbl, LOO=LOO)
                 df = df.append(
                     {
                         'doc_id': r[1].doc_id,
                         'author': r[1].author,
                         'wrt_author': auth0,
                         'HC': HC,
+                        'Fisher' : F,
                         'chisq': chisq,
                         'chisq_rank' : chisq_rank,
                         'chisq_pval' : chisq_pval,

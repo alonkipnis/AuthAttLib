@@ -527,6 +527,14 @@ class FreqTable(object):
         self.__compute_internal_stat() 
         return self
 
+    def get_FisherComb(self, dtbl, within=False) :
+
+        cnt0, cnt1 = self.__get_counts(dtbl, within=within)
+        pvals = FreqTable.two_sample_pvals_loc(cnt0, cnt1, 
+            randomize=self._randomize, min_cnt=self._min_cnt,
+            pval_type=self._pval_type)
+        return -2*np.sum(np.log(pvals))
+
 
     def get_ChiSquare(self, dtbl, within=False,
         lambda_ = None, LOO_rank=False):

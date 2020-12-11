@@ -2,15 +2,17 @@ from sklearn.feature_extraction.text import CountVectorizer
 import logging
 from scipy.stats import chisquare
 import met
+import pandas as pd
+import numpy as np
 
-from TwoSampleHC import two_sample_pvals, HC, binom_test_two_sided
+from .TwoSampleHC import two_sample_pvals, HC, binom_test_two_sided
 
 def exact_multinomial_test(x, p) : # slow
     assert(len(x) == len(p))
     n_max = 40
     p = np.array(p) / np.sum(p)
     n = sum(x)
-    if n > n_max :
+    if n > n_max or sum(x) == 0 :
         return chisquare(x, p * n)[1]
     all_multi_cases = [tup[0] for tup in met.onesided_exact_likelihood(x, [1,1,1])]
     probs = scipy.stats.multinomial.pmf(x=all_multi_cases, n=n, p=p)
@@ -21,12 +23,48 @@ class CompareDocs :
     def __init__(self, **kwargs) :
         self.pval_type = kwargs.get('pval_type', 'multinom')
         self.vocab = kwargs.get('vocabulary', [])
-        self.max_features = kwargs.get('max_features', 1000)
+        self.max_features = kwargs.get('max_features', 3000)
         self.min_cnt = kwargs.get('min_count', 3)
         self.ng_range = kwargs.get('ngram_range', (1,1))
 
         self.counts_df = pd.DataFrame()
         self.num_of_docs = np.nan
+        self.names = []
+        
+    def test_doc(self, doc, stbl=True, gamma=.2) : 
+    """
+    Test a new document against existing documents by combining binomial allocation
+    P-values from each document. 
+    """
+    
+        logging.debug(f"Testing a new doc...")            
+        if type(doc) == pd.DataFrame :
+            # Count words in a dataframe
+            logging.debug(f"Doc is a dataframe.")
+            dfi = pd.DataFrame(data.term.value_counts()).rename(columns={'term' : 'n'})
+        else :
+            logging.debug(f"Assuming doc is a string.")
+            dfi = self.count_words(doc)
+            dfi = dfi.set_index('term')
+
+        logging.debug(f"Doc contains {dfi.n.sum()} terms.")
+        df = self.HCT(gamma=gamma, stbl=stbl)
+        dfi['T(test)'] = dfi.n.sum()
+        dfi = dfi.rename(columns = {'n' : 'n(test)'})
+        df = df.join(dfi, how='left')
+        
+        
+        for name in self.names:
+            cnt1 = df['n(test)']
+            cnt2 = df['n' + name]
+            pv, p = two_sample_pvals(cnt1, cnt2, ret_p=True)
+            
+            df[f'pval({name})'] = pv
+            df[f'sign({name})'] = np.sign(cnt1 - (cnt1 + cnt2) * p)
+            df[f'score({name})'] = -2*np.log(df[f'pval({name})']) * df['thresh']
+    
+        return df
+
         
     def count_words(self, text) :
         df = pd.DataFrame()
@@ -65,6 +103,7 @@ class CompareDocs :
             
         for i,txt in enumerate(lo_texts) :
             name = f"{i+1}"
+            self.names += [name]
             logging.debug(f"Processing {name}...")
             dfi = self.count_words(txt).set_index('term')
             logging.debug(f"Found {dfi.n.sum()} terms.")
@@ -77,17 +116,13 @@ class CompareDocs :
         
         self.counts_df = df
         
-        
-    def HCtest(self, gamma=.2) :
-        """
-        To do: implement multinomial testing.
-        """
+    def get_pvals(self) :
         if self.num_of_docs < 2 :
             logging.error("Not enough columns.")
             return np.nan
+        df = self.counts_df.copy()
         if self.num_of_docs > 2 :
             logging.info("Using multinomial tests. May be slow.")
-            df = self.counts_df.copy()
             acc_x = []
             acc_p = []
             
@@ -99,11 +134,22 @@ class CompareDocs :
         
         else :
             logging.info("Using binomial tests.")
-            pv = two_sample_pvals(self.counts_df.n1, self.counts_df.n2)
+            pv = two_sample_pvals(df.n1, df.n2)
             
-        self.counts_df['pval'] = pv
-        hc, thr = HC(pv).HCstar(gamma=gamma)
-        self.counts_df['HC'] = hc
-        self.counts_df['thresh'] = pv < thr
-        return hc
+        df['pval'] = pv
+        return df
+
+
+    def HCT(self, gamma=.2, stbl=True) :
+        """
+        Return a DataFrame after applying HC threshold
+        
+        """
+        
+        df = self.get_pvals()
+
+        hc, thr = HC(df['pval'], stbl=stbl).HCstar(gamma=gamma)
+        df['HC'] = hc
+        df['thresh'] = df['pval'] < thr
+        return df
         

@@ -4,6 +4,7 @@ from scipy.stats import chisquare
 import met
 import pandas as pd
 import numpy as np
+import scipy
 
 from .TwoSampleHC import two_sample_pvals, HC, binom_test_two_sided
 

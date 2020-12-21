@@ -67,7 +67,7 @@ class CompareDocs :
             df[f'sign({name})'] = np.sign(cnt1 - (cnt1 + cnt2) * p)
             df[f'score({name})'] = -2*np.log(df[f'pval({name})'])
             df[f'HC({name})'], pth = HC(pv, stbl=stbl).HCstar(gamma=gamma)
-            df[f'HCT({name})'] = df[f'HC({name})'] < pth
+            df[f'HCT({name})'] = pv < pth
     
         return df
 

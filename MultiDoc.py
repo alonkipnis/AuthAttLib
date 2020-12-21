@@ -37,36 +37,36 @@ class CompareDocs :
         self.num_of_docs = np.nan
         self.names = []
         
-    def test_doc(self, doc, stbl=True, gamma=.2) : 
+    def test_doc(self, doc, stbl=True, gamma=.2, HCT=False) : 
         """
         Test a new document against existing documents by combining binomial allocation
         P-values from each document. 
+
+        To do: use CompareDocs.count_words for new doc
         """
-        logging.debug(f"Testing a new doc...")            
-        if type(doc) == pd.DataFrame :
-            # Count words in a dataframe
-            logging.debug(f"Doc is a dataframe.")
-            dfi = pd.DataFrame(doc.term.value_counts()).rename(columns={'term' : 'n'})
-        else :
-            logging.debug(f"Assuming doc is a string.")
-            dfi = self.count_words(doc)
-            dfi = dfi
+        
+        dfi = self.count_words(doc)
 
         logging.debug(f"Doc contains {dfi.n.sum()} terms.")
-        df = self.HCT(gamma=gamma, stbl=stbl)
+
+        if HCT :
+            df = self.HCT(gamma=gamma, stbl=stbl)
+        else :
+            df = self.counts_df
+
         dfi['T(test)'] = dfi.n.sum()
         dfi = dfi.rename(columns = {'n' : 'n(test)'})
         df = df.join(dfi, how='left')
         
-        
         for name in self.names:
-            cnt1 = df['n(test)']
-            cnt2 = df['n' + name]
+            cnt1 = df['n(test)'].astype(int)
+            cnt2 = df['n' + name].astype(int)
             pv, p = two_sample_pvals(cnt1, cnt2, ret_p=True)
             
             df[f'pval({name})'] = pv
             df[f'sign({name})'] = np.sign(cnt1 - (cnt1 + cnt2) * p)
-            df[f'score({name})'] = -2*np.log(df[f'pval({name})']) * df['thresh']
+            df[f'score({name})'] = -2*np.log(df[f'pval({name})'])
+            df[f'HC({name})'] = HC(pv, stbl=stbl).HCstar(gamma=gamma)[0]
     
         return df
 

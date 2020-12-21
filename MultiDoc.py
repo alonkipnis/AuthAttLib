@@ -45,7 +45,7 @@ class CompareDocs :
         if type(doc) == pd.DataFrame :
             # Count words in a dataframe
             logging.debug(f"Doc is a dataframe.")
-            dfi = pd.DataFrame(data.term.value_counts()).rename(columns={'term' : 'n'})
+            dfi = pd.DataFrame(doc.term.value_counts()).rename(columns={'term' : 'n'})
         else :
             logging.debug(f"Assuming doc is a string.")
             dfi = self.count_words(doc)
@@ -75,7 +75,8 @@ class CompareDocs :
         
         if type(data) == pd.DataFrame :
             df_vocab = pd.DataFrame({'term' : self.vocab}).set_index('term')
-            df = pd.DataFrame(data.term.value_counts()).rename(columns={'term' : 'n'})
+            df = pd.DataFrame(data.term.value_counts())\
+                    .rename(columns={'term' : 'n'})
             return df_vocab.join(df, how='left').fillna(0)
 
         pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"

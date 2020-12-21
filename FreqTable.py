@@ -266,6 +266,7 @@ class FreqTable(object):
                         )
         return pv
 
+
     def two_table_HC_test(self, dtbl, **kwargs) :
         """
         counts, p-values, and HC with 
@@ -312,6 +313,7 @@ class FreqTable(object):
             except :
                 df.loc[:,'feature'] = [lbls]
         return df
+
 
     def internal_feature_test(self) :
         df = pd.DataFrame(self._dtm.todense(), 
@@ -533,7 +535,7 @@ class FreqTable(object):
         pvals = FreqTable.two_sample_pvals_loc(cnt0, cnt1, 
             randomize=self._randomize, min_cnt=self._min_cnt,
             pval_type=self._pval_type)
-        return -2*np.sum(np.log(pvals))
+        return -2*np.mean(np.log(pvals))
 
 
     def get_ChiSquare(self, dtbl, within=False,

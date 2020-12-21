@@ -20,6 +20,11 @@ def exact_multinomial_test(x, p) : # slow
     return pval
 
 class CompareDocs :
+    """
+    Class to compare documents in terms of word frequencies. 
+    Can select distinguishing words using Higher Criticism threshold. 
+    Also tests the similarity of a new document using binomial allocation. 
+    """
     def __init__(self, **kwargs) :
         self.pval_type = kwargs.get('pval_type', 'multinom')
         self.vocab = kwargs.get('vocabulary', [])
@@ -32,11 +37,10 @@ class CompareDocs :
         self.names = []
         
     def test_doc(self, doc, stbl=True, gamma=.2) : 
-    """
-    Test a new document against existing documents by combining binomial allocation
-    P-values from each document. 
-    """
-    
+        """
+        Test a new document against existing documents by combining binomial allocation
+        P-values from each document. 
+        """
         logging.debug(f"Testing a new doc...")            
         if type(doc) == pd.DataFrame :
             # Count words in a dataframe
@@ -45,7 +49,7 @@ class CompareDocs :
         else :
             logging.debug(f"Assuming doc is a string.")
             dfi = self.count_words(doc)
-            dfi = dfi.set_index('term')
+            dfi = dfi
 
         logging.debug(f"Doc contains {dfi.n.sum()} terms.")
         df = self.HCT(gamma=gamma, stbl=stbl)
@@ -66,8 +70,13 @@ class CompareDocs :
         return df
 
         
-    def count_words(self, text) :
+    def count_words(self, data) :
         df = pd.DataFrame()
+        
+        if type(data) == pd.DataFrame :
+            df_vocab = pd.DataFrame({'term' : self.vocab}).set_index('term')
+            df = pd.DataFrame(data.term.value_counts()).rename(columns={'term' : 'n'})
+            return df_vocab.join(df, how='left').fillna(0)
 
         pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
         pat = r"\b\w\w+\b"
@@ -87,30 +96,33 @@ class CompareDocs :
         vocab = tf_vectorizer.get_feature_names()
         tc = np.array(tf.sum(0))[0]
 
-        df = pd.concat([df, pd.DataFrame({'term': vocab, 'n': tc})])
+        df = pd.concat([df, pd.DataFrame({'term': vocab, 'n': tc})]).set_index('term')
         return df
-    
-    def fit(self, lo_texts) :
+            
+    def fit(self, lo_docs) :
         df = pd.DataFrame()
-        if self.vocab == [] : # build vocabulry from data
-            logging.debug("Building vocabulary from data")
-            df_tot = self.count_words(" ".join(lo_texts))
-            self.vocab = list(df_tot[df_tot.n >= self.min_cnt]['term'])
+        if self.vocab == [] :
+            logging.error("You must provide a vocabulary.")
+            raise ValueError
         
         df['term'] = self.vocab
         df['n'] = 0
         df = df.set_index('term')
             
-        for i,txt in enumerate(lo_texts) :
+        for i,txt in enumerate(lo_docs) :
             name = f"{i+1}"
             self.names += [name]
             logging.debug(f"Processing {name}...")
-            dfi = self.count_words(txt).set_index('term')
+            dfi = self.count_words(txt)
+            dfi['n'] = dfi['n'].astype(int)
             logging.debug(f"Found {dfi.n.sum()} terms.")
-            df['n'] += dfi.n 
+            df['n'] += dfi.n
+
             dfi['T' + name] = dfi.n.sum()
             dfi = dfi.rename(columns = {'n' : 'n' + name})
             df = df.join(dfi, how='left', rsuffix=name)
+            values = {'n'+name: 0, 'T' + name : max(df['T' + name])}
+            df = df.fillna(value=values)
         
         self.num_of_docs = i + 1
         
@@ -123,10 +135,6 @@ class CompareDocs :
         df = self.counts_df.copy()
         if self.num_of_docs > 2 :
             logging.info("Using multinomial tests. May be slow.")
-            acc_x = []
-            acc_p = []
-            
-            acc_x = [df[c] for c in df if c == 'n']
 
             df['x'] = df.filter(regex='n[0-9]').to_records(index=False).tolist()
             df['p'] = df.filter(regex='T[0-9]').to_records(index=False).tolist()
@@ -142,8 +150,8 @@ class CompareDocs :
 
     def HCT(self, gamma=.2, stbl=True) :
         """
-        Return a DataFrame after applying HC threshold
-        
+        Return results of after applying HC threshold
+
         """
         
         df = self.get_pvals()
@@ -152,4 +160,3 @@ class CompareDocs :
         df['HC'] = hc
         df['thresh'] = df['pval'] < thr
         return df
-        

@@ -241,6 +241,7 @@ class AuthorshipAttributionMulti(object):
                     LOO_rank=LOO
                     )
                 F = md1.get_FisherComb(dtbl, within=True)
+                F = md1.get_FisherComb(dtbl, within=True)
 
                 cosine = md1.get_CosineSim(dtbl, within=True)
             else:
@@ -524,6 +525,7 @@ class AuthorshipAttributionMulti(object):
         
         if auth_doc_pair1[0] == auth_doc_pair2[0] :
             if auth_doc_pair1[1] == None:
+                logging.debug('Removing counts of document 2 from corpus 1.')
                 return md1.two_table_HC_test(md2, within=True, **kwargs)            
             
         return md1.two_table_HC_test(md2, within=False, **kwargs)

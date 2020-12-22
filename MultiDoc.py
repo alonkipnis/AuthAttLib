@@ -34,10 +34,10 @@ class CompareDocs :
         self.ng_range = kwargs.get('ngram_range', (1,1))
 
         self.counts_df = pd.DataFrame()
-        self.num_of_docs = np.nan
+        self.num_of_cls = np.nan
         self.names = []
         
-    def test_doc(self, doc, stbl=True, gamma=.2, HCT=False) : 
+    def test_doc(self, doc, stbl=True, gamma=.2, HCT=False, of_cls=None) : 
         """
         Test a new document against existing documents by combining binomial allocation
         P-values from each document. 
@@ -60,6 +60,7 @@ class CompareDocs :
         
         for name in self.names:
             cnt1 = df['n(test)'].astype(int)
+            if of_cls 
             cnt2 = df['n' + name].astype(int)
             pv, p = two_sample_pvals(cnt1, cnt2, ret_p=True)
             
@@ -102,7 +103,12 @@ class CompareDocs :
         df = pd.concat([df, pd.DataFrame({'term': vocab, 'n': tc})]).set_index('term')
         return df
             
-    def fit(self, lo_docs) :
+    def fit(self, data) :
+        """
+        ARGS:
+        -----
+        data    :   dictionary. One entry per class. Values are strings. 
+        """
         df = pd.DataFrame()
         if self.vocab == [] :
             logging.error("You must provide a vocabulary.")
@@ -112,10 +118,10 @@ class CompareDocs :
         df['n'] = 0
         df = df.set_index('term')
             
-        for i,txt in enumerate(lo_docs) :
-            name = f"{i+1}"
+        for name in enumerate(data) :
             self.names += [name]
             logging.debug(f"Processing {name}...")
+            txt = data[name]
             dfi = self.count_words(txt)
             dfi['n'] = dfi['n'].astype(int)
             logging.debug(f"Found {dfi.n.sum()} terms.")
@@ -127,16 +133,16 @@ class CompareDocs :
             values = {'n'+name: 0, 'T' + name : max(df['T' + name])}
             df = df.fillna(value=values)
         
-        self.num_of_docs = i + 1
+        self.num_of_cls = i + 1
         
         self.counts_df = df
         
     def get_pvals(self) :
-        if self.num_of_docs < 2 :
+        if self.num_of_cls < 2 :
             logging.error("Not enough columns.")
             return np.nan
         df = self.counts_df.copy()
-        if self.num_of_docs > 2 :
+        if self.num_of_cls > 2 :
             logging.info("Using multinomial tests. May be slow.")
 
             df['x'] = df.filter(regex='n[0-9]').to_records(index=False).tolist()

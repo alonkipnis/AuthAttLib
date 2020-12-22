@@ -60,8 +60,11 @@ class CompareDocs :
         
         for name in self.names:
             cnt1 = df['n(test)'].astype(int)
-            if of_cls 
             cnt2 = df['n' + name].astype(int)
+            if of_cls == name : # if tested document is already represented in 
+                                # corpus, remove its counts to get a meaningful
+                                # comparison. 
+                cnt2-=cnt1
             pv, p = two_sample_pvals(cnt1, cnt2, ret_p=True)
             
             df[f'pval({name})'] = pv

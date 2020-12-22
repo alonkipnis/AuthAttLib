@@ -54,24 +54,24 @@ class CompareDocs :
         else :
             df = self.counts_df
 
-        dfi['T(test)'] = dfi.n.sum()
-        dfi = dfi.rename(columns = {'n' : 'n(test)'})
+        dfi['T (test)'] = dfi.n.sum()
+        dfi = dfi.rename(columns = {'n' : 'n (test)'})
         df = df.join(dfi, how='left')
         
         for name in self.names:
-            cnt1 = df['n(test)'].astype(int)
-            cnt2 = df['n' + name].astype(int)
+            cnt1 = df['n (test)'].astype(int)
+            cnt2 = df[f'n ({name})'].astype(int)
             if of_cls == name : # if tested document is already represented in 
                                 # corpus, remove its counts to get a meaningful
                                 # comparison. 
-                cnt2-=cnt1
+                cnt2 -= cnt1
             pv, p = two_sample_pvals(cnt1, cnt2, ret_p=True)
             
-            df[f'pval({name})'] = pv
-            df[f'sign({name})'] = np.sign(cnt1 - (cnt1 + cnt2) * p)
-            df[f'score({name})'] = -2*np.log(df[f'pval({name})'])
-            df[f'HC({name})'], pth = HC(pv, stbl=stbl).HCstar(gamma=gamma)
-            df[f'HCT({name})'] = pv < pth
+            df[f'pval ({name})'] = pv
+            df[f'sign ({name})'] = np.sign(cnt1 - (cnt1 + cnt2) * p)
+            df[f'score ({name})'] = -2*np.log(df[f'pval ({name})'])
+            df[f'HC ({name})'], pth = HC(pv, stbl=stbl).HCstar(gamma=gamma)
+            df[f'HCT ({name})'] = pv < pth
     
         return df
 
@@ -120,8 +120,14 @@ class CompareDocs :
         df['term'] = self.vocab
         df['n'] = 0
         df = df.set_index('term')
+
+        def n_label(name) :
+            return f"n ({name})"
+
+        def T_label(name) :
+            return f"T ({name})"
             
-        for name in enumerate(data) :
+        for name in data :
             self.names += [name]
             logging.debug(f"Processing {name}...")
             txt = data[name]
@@ -130,13 +136,14 @@ class CompareDocs :
             logging.debug(f"Found {dfi.n.sum()} terms.")
             df['n'] += dfi.n
 
-            dfi['T' + name] = dfi.n.sum()
-            dfi = dfi.rename(columns = {'n' : 'n' + name})
+            dfi[T_label(name)] = dfi.n.sum()
+            dfi = dfi.rename(columns = {'n' : n_label(name)})
             df = df.join(dfi, how='left', rsuffix=name)
-            values = {'n'+name: 0, 'T' + name : max(df['T' + name])}
+            values = {n_label(name) : 0, 
+                     T_label(name) : max(df[T_label(name)])}
             df = df.fillna(value=values)
         
-        self.num_of_cls = i + 1
+        self.num_of_cls = len(self.names)
         
         self.counts_df = df
         
@@ -148,8 +155,8 @@ class CompareDocs :
         if self.num_of_cls > 2 :
             logging.info("Using multinomial tests. May be slow.")
 
-            df['x'] = df.filter(regex='n[0-9]').to_records(index=False).tolist()
-            df['p'] = df.filter(regex='T[0-9]').to_records(index=False).tolist()
+            df['x'] = df.filter(regex="n \(").to_records(index=False).tolist()
+            df['p'] = df.filter(regex="T \(").to_records(index=False).tolist()
             pv = df.apply(lambda r : exact_multinomial_test(r['x'], r['p']), axis = 1)
         
         else :

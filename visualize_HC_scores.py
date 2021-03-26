@@ -185,16 +185,14 @@ def plot_LDA(df, value, wrt_authors, sym = False) :
     df_plot = df1.melt(['t','author','doc_id'], [wrt_authors[0],wrt_authors[1]])
  
     p = (
-        ggplot(
-                aes(
+        ggplot(aes(
                 x='t',
                 y='value',
                 color='author',
                 fill='author',
                 label='doc_id'
                 ),
-            data=df_plot
-            ) + geom_rug(
+            data=df_plot) + geom_rug(
             aes(x='t', y=0, color='author'),
             position=position_jitter(height=0),
             size=1

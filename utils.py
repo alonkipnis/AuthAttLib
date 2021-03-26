@@ -98,7 +98,6 @@ def n_most_frequent_balanced(df, n,
         words_to_ignore=words_to_ignore
                     )
 
-
 def n_most_frequent_words(texts, n, 
                 words_to_ignore=[],
                 ngram_range=(1, 1),

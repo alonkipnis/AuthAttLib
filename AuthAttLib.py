@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 from tqdm import *
-from .utils import to_docTermCounts,\
+from utils import to_docTermCounts,\
  n_most_frequent_words, extract_ngrams
-from .FreqTable import FreqTable
+from FreqTable import FreqTable
 from sklearn.model_selection import train_test_split
 import warnings
 import scipy
@@ -475,7 +475,7 @@ class AuthorshipAttributionMulti(object):
                 cosine = md0.get_CosineSim(dtbl)
                 HC = md0.get_HC(dtbl)
                 rank = md0.get_rank(dtbl, LOO=LOO)
-                F = md0.get_FisherComb(dtbl, LOO=LOO)
+                F = md0.get_FisherComb(dtbl)
                 df = df.append(
                     {
                         'doc_id': r[1].doc_id,

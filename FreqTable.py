@@ -9,14 +9,13 @@ import sys
 from TwoSampleHC import HC, binom_test_two_sided,\
          two_sample_pvals, two_sample_test_df,\
          binom_var_test, binom_var_test_df
-from goodness_of_fit_tests import *
+from .goodness_of_fit_tests import *
 
 import logging
 
 
 #To do :
 # complete class MultiTable
-
 
 class FreqTable(object):
     """ 

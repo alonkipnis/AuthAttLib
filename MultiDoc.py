@@ -1,7 +1,7 @@
 from sklearn.feature_extraction.text import CountVectorizer
 import logging
 from scipy.stats import chisquare, poisson, binom
-import met
+from typing import Dict, List
 import pandas as pd
 import numpy as np
 from scipy.special import binom as nkchoose
@@ -11,6 +11,7 @@ from TwoSampleHC import two_sample_pvals, HC, binom_test_two_sided
 
 
 def multinomial_test(x, p) : # slow
+    import met
     assert(len(x) == len(p))
     n_max = 40
     r_max = 1e6
@@ -183,11 +184,11 @@ class CompareDocs :
                .set_index('feature')
         return df
             
-    def fit(self, data) :
+    def fit(self, data : Dict) :
         """
         ARGS:
         -----
-        data    :   dictionary. One entry per class. Values : string. 
+        data    One entry per class. Values : string. 
         """
         df = pd.DataFrame()
         if self.vocab == [] :

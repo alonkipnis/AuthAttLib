@@ -1,7 +1,7 @@
 from scipy.stats import chi2_contingency, norm
 from scipy.spatial.distance import cosine
 
-from .TwoSampleHC import two_sample_pvals, HC
+from TwoSampleHC import two_sample_pvals, HC
 import numpy as np
 
 def HC_sim(c1, c2, gamma=0.15, randomize=False, pval_thresh=1.1) : 

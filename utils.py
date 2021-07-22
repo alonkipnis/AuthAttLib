@@ -98,6 +98,34 @@ def n_most_frequent_balanced(df, n,
         words_to_ignore=words_to_ignore
                     )
 
+def n_most_frequent_words_per_author(df, n, 
+                words_to_ignore=[],
+                ngram_range=(1, 1),
+                balanced=False
+                         ):
+    """
+        Return 'n' of the most frequent tokens in the corpus represented by the 
+        list of strings 'texts'
+    """
+
+    pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
+    
+    tf_vectorizer = CountVectorizer(stop_words=words_to_ignore,
+                                    token_pattern=pat,
+                                    ngram_range=ngram_range)
+
+    vocab = []
+    for auth in df.author.unique() :
+        
+        tf = tf_vectorizer.fit_transform(df[df.author == auth].text)
+        feature_names = np.array(tf_vectorizer.get_feature_names())
+
+        idcs = np.argsort(-tf.sum(0))
+        vocab += list(np.array(feature_names)[idcs][0][:n])
+    
+    return list(set(vocab))
+
+
 def n_most_frequent_words(texts, n, 
                 words_to_ignore=[],
                 ngram_range=(1, 1),

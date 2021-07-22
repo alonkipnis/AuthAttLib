@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 from tqdm import *
-from .FreqTable import FreqTable
-from .utils import to_docTermCounts,\
+from FreqTable import FreqTable
+from utils import to_docTermCounts,\
  n_most_frequent_words, extract_ngrams
 
 from sklearn.model_selection import train_test_split
@@ -242,7 +242,6 @@ class AuthorshipAttributionMulti(object):
                     LOO_rank=LOO
                     )
                 F = md1.get_FisherComb(dtbl, within=True)
-                F = md1.get_FisherComb(dtbl, within=True)
 
                 cosine = md1.get_CosineSim(dtbl, within=True)
             else:
@@ -270,7 +269,6 @@ class AuthorshipAttributionMulti(object):
                     'wrt_author': auth1,
                     'HC': HC,
                     'Fisher' : F,
-                    #'BJ' : bj,
                     'chisq': chisq,
                     'chisq_rank' : chisq_rank,
                     'Cressie-Read' : CR,

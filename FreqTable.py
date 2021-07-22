@@ -9,10 +9,11 @@ import sys
 from TwoSampleHC import HC, binom_test_two_sided,\
          two_sample_pvals, two_sample_test_df,\
          binom_var_test, binom_var_test_df
-from .goodness_of_fit_tests import *
+from goodness_of_fit_tests import *
 
 import logging
 
+EPS = 1e-6
 
 #To do :
 # complete class MultiTable
@@ -395,7 +396,7 @@ class FreqTable(object):
         Args:
         -------
         new_row : is a (optional) new row (array of size (1,# of columns))
-        sim_measure(c1 : [int], c2 : [int]) -> float
+        sim_measure(c1 : int, c2 : int) -> float
         within : indicates weather 'new_row' is already a 
                  row in the table
         """
@@ -411,7 +412,7 @@ class FreqTable(object):
             cnt0 = np.squeeze(new_row)
             cnt1 = FreqTable.get_mat_sum(mat) - cnt0
             if np.any(cnt1 < 0):
-                raise ValueError("'within == True' is invalid")
+                raise ValueError("'within == True' does not make sense")
 
             lo_scores += [sim_measure(cnt0, cnt1)]
         else :
@@ -602,28 +603,28 @@ class FreqTable(object):
     
     def get_rank(self, dtbl, sim_measure=None, within=False, LOO=True) :
         """ returns the rank of the similarity of dtbl compared to each
-            row in the data-table. 
+            row in the table. 
         Args:
-            dtbl : another FreqTable 
-            LOO : Leave One Out evaluation of the rank (much slower process
-                    but more accurate; especially when number of documents
+        -----
+        dtbl : another FreqTable 
+        LOO : Leave One Out evaluation of the rank (much slower but
+                    more accurate; especially when the number of documents
                     is small)
-            within -- indicate whether tested table is included in current 
-                    FreqTable object. if within==True then tested _count
-                    are subtracted from FreqTable._dtm
+        within :  indicates whether tested table is included in current 
+                   FreqTable object. if within==True then tested _count
+                   are subtracted from FreqTable._dtm
         Return :
             rank of score among internal ranks
 
-        Todo: 
-            provide the option to use similarity measures other than HC
          """
         if sim_measure == None :
             sim_measure = self.row_similarity
         else : 
-            LOO = True # because internal scores are only meaningful
-                       # under the default similarity measure
+            LOO = True # because rank in stored scores 
+                       # is only meaningful is we use the 
+                       # default similarity measure
 
-        if LOO == False : # rank in stored HC scores
+        if LOO == False : # rank in stored scores
             lo_scores = self._internal_scores
             cnt0, cnt1 = self.__get_counts(dtbl, within=within)
             score = sim_measure(cnt0, cnt1)
@@ -632,13 +633,19 @@ class FreqTable(object):
         elif LOO == True :
             lo_scores = self._per_row_similarity_LOO(sim_measure,
                              dtbl._counts, within=within)
+            # here we assume that the score of the other 
+            # table appears first in lo_scores
 
         if len(lo_scores) > 1:
             score = lo_scores[0]
-            rank = np.mean(np.array(lo_scores[1:]) < score) 
+            rank = np.mean(np.array(lo_scores <= score) )
         else:
             rank = np.nan
         
+        assert(rank > EPS)
+
+        assert(rank < 1 + EPS)
+
         return rank
 
     def get_HC_rank_features(self,

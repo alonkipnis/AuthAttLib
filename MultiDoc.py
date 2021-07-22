@@ -10,6 +10,12 @@ import scipy
 from TwoSampleHC import two_sample_pvals, HC, binom_test_two_sided
 
 
+def n_label(cls) :
+            return f"n ({cls})"
+
+def T_label(cls) :
+    return f"T ({cls})"
+
 def multinomial_test(x, p) : # slow
     import met
     assert(len(x) == len(p))
@@ -19,12 +25,23 @@ def multinomial_test(x, p) : # slow
     n = sum(x)
     if sum(x) == 0 or nkchoose(n,len(p)) > r_max :
         logging.warning(f"Number of combinations is too large."
-        " Approximating exact binomial test using chisquare test.")
+        " Approximating exact binomial test using chisquared test.")
         return chisquare(x, p * n)[1]
     all_multi_cases = met.all_multinom_cases(len(p), n)
     probs = scipy.stats.multinomial.pmf(x=all_multi_cases, n=n, p=p)
     pval = probs[probs <= probs[all_multi_cases.index(list(x))]].sum()
     return pval
+
+
+def poisson_test_two_sided_matrix_appx(x, lm) :
+    return np.select([x < lm, x >= lm], [poisson.cdf(x, lm), poisson.sf(x, lm)])
+
+def poisson_test_two_sided_matrix(x, lm) :
+    pl = np.select([x < lm, x > lm, x==lm], [poisson.cdf(x, lm), poisson.sf(x, lm), 1])
+    pu = np.select([x < lm, x > lm], [poisson.sf(poisson.isf(pl, lm), lm), poisson.sf(x, lm)])
+
+    return pl + pu
+
 
 def poisson_test_two_sided(x, lm) :
     pl = poisson.cdf(x, lm) * (x < lm) + poisson.sf(x, lm) * (x > lm) + (x==lm)
@@ -62,14 +79,15 @@ def binom_test_two_sided(x, n, p) :
 class CompareDocs :
     """
     Class to compare documents in terms of word frequencies. 
-    Can select distinguishing words using Higher Criticism threshold. 
-    Also tests the similarity of a new document using binomial allocation. 
+    Can select distinguishing words by Higher Criticism thresholding. 
+    Can test the similarity of a new document using a binomial allocation model
+    for word occurances. 
     """
     def __init__(self, **kwargs) :
         self.pval_type = kwargs.get('pval_type', 'multinom')
         self.vocab = kwargs.get('vocabulary', [])
         self.max_features = kwargs.get('max_features', 3000)
-        self.min_cnt = kwargs.get('min_count', 3)
+        self.min_cnt = kwargs.get('min_count', 1)
         self.ng_range = kwargs.get('ngram_range', (1,1))
 
         self.counts_df = pd.DataFrame()
@@ -156,18 +174,31 @@ class CompareDocs :
     
         return df
         
-    def count_words(self, data) :
-        df = pd.DataFrame()
+    def count_words(self, text_data) -> pd.DataFrame :
+        """
+        Count the number of terms in the data. 
+    
+        Args:
+        ========
+        text_data can be a dataframe in which each row is a feature
+        or a string representing text.
+
+        Returns:
+        =======
+        Dataframe indicating the count of each feature
+
+        """
         
-        if type(data) == pd.DataFrame :
+        if type(text_data) == pd.DataFrame :
             df_vocab = pd.DataFrame({'feature' : self.vocab})\
                          .set_index('feature')
-            df = pd.DataFrame(data.feature.value_counts())\
+            df = pd.DataFrame(text_data.feature.value_counts())\
                     .rename(columns={'feature' : 'n'})
             return df_vocab.join(df, how='left').fillna(0)
 
-        pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
-        pat = r"\b\w\w+\b"
+        # else:
+        pat = r"\b\w\w+\b|[Ia\.!?%\(\);,:\-\"\`]"
+        #pat = r"\b\w\w+\b"
         # term counts
         if len(self.vocab) == 0:
             tf_vectorizer = CountVectorizer(token_pattern=pat, 
@@ -176,19 +207,23 @@ class CompareDocs :
             tf_vectorizer = CountVectorizer(token_pattern=pat,
                     vocabulary=self.vocab, ngram_range=self.ng_range)
             
-        tf = tf_vectorizer.fit_transform([data])
+        tf = tf_vectorizer.fit_transform([text_data])
         vocab = tf_vectorizer.get_feature_names()
         tc = np.array(tf.sum(0))[0]
 
+        df = pd.DataFrame()
         df = pd.concat([df, pd.DataFrame({'feature': vocab, 'n': tc})])\
                .set_index('feature')
         return df
             
     def fit(self, data : Dict) :
         """
+        
+
         ARGS:
         -----
         data    One entry per class. Values : string. 
+
         """
         df = pd.DataFrame()
         if self.vocab == [] :
@@ -199,13 +234,8 @@ class CompareDocs :
         df['n'] = 0
         df['T'] = 0
         df = df.set_index('feature')
-
-        def n_label(cls) :
-            return f"n ({cls})"
-
-        def T_label(cls) :
-            return f"T ({cls})"
             
+        logging.info(f"Processing {len(data)} texts...")
         for cls in data :
             self.cls_names += [cls]
             logging.debug(f"Processing {cls}...")
@@ -228,9 +258,12 @@ class CompareDocs :
         self.counts_df = df
         
     def get_pvals(self) :
+        """
+        Compute P-values using exact multinomial tests
+        """
         if self.num_of_cls < 2 :
             logging.error("Not enough columns.")
-            return np.nan
+            return None
         df = self.counts_df.copy()
         if self.num_of_cls > 2 :
             logging.info("Using multinomial tests. May be slow.")
@@ -249,8 +282,8 @@ class CompareDocs :
 
     def HCT(self, gamma=.2, stbl=True) :
         """
-        Return results after applying HC threshold to fitted data
-        Report whether a feature is selected by HC threshold
+        Apply HC threshold to fitted data and report features
+        whose P-value falls below HC threshold
 
         """
         
@@ -261,6 +294,29 @@ class CompareDocs :
         df['thresh'] = df['pval'] < thr
         return df
 
+    def get_Poisson_pvals(self) :
+        p = (self.counts_df['n'] / self.counts_df['T']).values
+        expected = self.counts_df.filter(regex="T \(").values * np.expand_dims(p,1)
+        observed = self.counts_df.filter(regex="n \(").values
+            # observed feature frequency
+
+        pval_mat = poisson_test_two_sided_matrix(observed, expected)
+        return pval_mat
+
+    def HC_Poiss(self, gamma=.2, stbl=True) :
+        """
+        For each word, test wheather it is uniformly distributed 
+        over documents. 
+
+        Observed counts: N(w|D1), ..., N(w|Dn)
+        Expected counts: |D1|*p, ..., |Dn|*p
+        p = N(w) / (|D1| + ... + |Dn|)
+
+        """
+        pval_mat = self.get_Poisson_pvals()
+        pval_min = pval_mat.min(0)
+
+
     def test_cls_Poiss(self, cls_name, gamma=.2, stbl=True) :
         """
         HC Test of one class against the rest. Returns HC value 
@@ -268,8 +324,8 @@ class CompareDocs :
 
         """
         df1 = pd.DataFrame()
-        col_name_n = f"n ({cls_name})"
-        col_name_T = f"T ({cls_name})" 
+        col_name_n = n_label(cls_name)
+        col_name_T = T_label(cls_name)
         df1 = self.counts_df.filter([col_name_n, col_name_T])
         df1['frequency'] = self.counts_df['n'] / self.counts_df["T"] 
             # observed feature frequency
@@ -290,8 +346,8 @@ class CompareDocs :
 
         """
         df1 = pd.DataFrame()
-        col_name_n = f"n ({cls_name})"
-        col_name_T = f"T ({cls_name})"
+        col_name_n = self.n_label(cls_name)
+        col_name_T = self.T_label(cls_name)
         df1 = self.counts_df.filter([col_name_n, col_name_T])
         df1['n (rest)'] = self.counts_df['n'] - df1[col_name_n]
         df1['T (rest)'] = self.counts_df["T"] - df1[col_name_T]
@@ -308,7 +364,7 @@ class CompareDocs :
     def HCT_vs_many_Poiss(self, gamma=.2, stbl=True) :
         """
         Apply HC threshold to fitted data in a 1-vs-many fashion
-        with many Poisson tests. Returns DataFrame with columns 
+        based on many Poisson tests. Returns DataFrame with columns 
         'affinity (cls)' indicating the affinity of the class to
         each feature:
          1 : more frequent features

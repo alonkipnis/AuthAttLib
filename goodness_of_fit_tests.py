@@ -4,7 +4,8 @@ from scipy.spatial.distance import cosine
 from TwoSampleHC import two_sample_pvals, HC
 import numpy as np
 
-def HC_sim(c1, c2, gamma=0.15, randomize=False, pval_thresh=1.1) : 
+def HC_sim(c1, c2, gamma=0.15, randomize=False,
+           pval_thresh=1.1, HCtype='HCstar') : 
     """
     Higher-Criticism (HC) similarity of two discrete samples
 
@@ -26,7 +27,13 @@ def HC_sim(c1, c2, gamma=0.15, randomize=False, pval_thresh=1.1) :
     if len(pvals_red) == 0 :
         return np.nan
 
-    hc, _ = HC(pvals_red).HCstar(gamma=gamma)
+    if HCtype == 'HCstar' :
+        hc, _ = HC(pvals_red).HCstar(gamma=gamma)
+    elif HCtype == 'original' :
+        hc, _ = HC(pvals_red).HC(gamma=gamma)
+    else :
+        raise ValueError(f"{HCtype} is not a valid value for HCtype")
+        exit(1)
     return hc
 
 def BJ_sim(c1, c2, gamma=0.1, randomize=False, pval_thresh=1.1) : 

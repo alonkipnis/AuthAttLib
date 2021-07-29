@@ -9,7 +9,7 @@ import sys
 from TwoSampleHC import HC, binom_test_two_sided,\
          two_sample_pvals, two_sample_test_df,\
          binom_var_test, binom_var_test_df
-from goodness_of_fit_tests import *
+from .goodness_of_fit_tests import *
 
 import logging
 
@@ -40,7 +40,7 @@ class FreqTable(object):
 
     def __init__(self, dtm, column_labels=[], row_labels=[],
         min_cnt=0, stbl=True, gamma=0.25, randomize=False,
-         pval_thresh=1.1, pval_type='cell', max_m=-1) :
+         pval_thresh=1.1, pval_type='cell', max_m=-1, HCtype='HCstar') :
         
         if len(row_labels) < dtm.shape[0] :
             row_labels = ["smp" + str(i) for i in range(dtm.shape[0])]
@@ -65,6 +65,7 @@ class FreqTable(object):
         #import pdb; pdb.set_trace()
         self._max_m = max_m
         self._pval_type = pval_type 
+        self._HCtype = HCtype
 
         if dtm.sum() == 0:
             raise ValueError(
@@ -119,7 +120,7 @@ class FreqTable(object):
 
     def row_similarity(self, c1, c2) :
         hc = HC_sim(c1, c2, gamma=self._gamma, randomize=self._randomize,
-                         pval_thresh=self._pval_thresh)
+                         pval_thresh=self._pval_thresh, HCtype=self._HCtype)
         return hc
 
     def __compute_internal_stat(self, compute_pvals=True):
@@ -145,6 +146,15 @@ class FreqTable(object):
         np.warnings.filterwarnings('always')
         if len(pv) > 0 :
             hc = HC(pv, stbl=self._stbl)
+
+            if self._HCtype == 'HCstar' :
+                hc, _ = HC(pvals_red).HCstar(gamma=gamma)
+            elif self._HCtype == 'original' :
+                hc, _ = HC(pvals_red).HC(gamma=gamma)
+            else :
+                raise ValueError(f"{HCtype} is not a valid value for HCtype")
+                exit(1)
+
             return hc.HCstar(gamma=self._gamma)
         else :
             logging.warning("Did not find any P-values.")
@@ -286,12 +296,13 @@ class FreqTable(object):
 
         """
         stbl = kwargs.get('stbl', self._stbl)
+        HCtype = kwargs.get('HCtype', 'HCstar')
         randomize = kwargs.get('randomize', self._randomize)
         gamma = kwargs.get('gamma', self._gamma)
         within = kwargs.get('within', False)
         min_cnt = kwargs.get('min_cnt', self._min_cnt)
         pval_type = kwargs.get('pval_type', self._pval_type)
-        max_m = pvals_type = kwargs.get('max_m', -1)
+        max_m = kwargs.get('max_m', -1)
 
         cnt0, cnt1 = self.__get_counts(dtbl, within=within)
         
@@ -302,11 +313,9 @@ class FreqTable(object):
         else :
             logging.debug('Computing cell P-values.')
             df = two_sample_test_df(cnt0, cnt1,
-                 stbl=stbl,
-                randomize=randomize,
-                gamma=gamma,
-                min_cnt=min_cnt
-                )
+                stbl=stbl, randomize=randomize,
+                gamma=gamma, min_cnt=min_cnt,
+                HCtype=HCtype)
             lbls = self._column_labels
             try :
                 df.loc[:,'feature'] = lbls
@@ -714,7 +723,11 @@ class FreqTableClassifier(NearestNeighbors) :
         """
         Parameters:
         -----------
-        metric : string -- what similarity measure to use
+        metric : discrepancy measure to use. One of:
+                HC, chisq, cosine, chisq_pval, 
+                log-likelihood, freeman-tukey, 
+                mod-log-likelihood, neyman,
+                cressie-read
         kwargs : argument to FreqTable
         """
         

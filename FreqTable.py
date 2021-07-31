@@ -145,17 +145,13 @@ class FreqTable(object):
 
         np.warnings.filterwarnings('always')
         if len(pv) > 0 :
-            hc = HC(pv, stbl=self._stbl)
-
             if self._HCtype == 'HCstar' :
-                hc, _ = HC(pvals_red).HCstar(gamma=gamma)
-            elif self._HCtype == 'original' :
-                hc, _ = HC(pvals_red).HC(gamma=gamma)
+                return HC(pv, stbl=self._stbl).HCstar(gamma=self._gamma)
+            if self._HCtype == 'original' :
+                return HC(pv, stbl=self._stbl).HC(gamma=self._gamma)
             else :
                 raise ValueError(f"{HCtype} is not a valid value for HCtype")
                 exit(1)
-
-            return hc.HCstar(gamma=self._gamma)
         else :
             logging.warning("Did not find any P-values.")
             return np.nan, np.nan

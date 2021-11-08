@@ -8,7 +8,7 @@ from scipy.special import binom as nkchoose
 import scipy
 
 from TwoSampleHC import two_sample_pvals, HC, binom_test_two_sided
-import goodness_of_fit_tests
+from .goodness_of_fit_tests import two_sample_chi_square
 
 def n_label(cls) :
             return f"n ({cls})"
@@ -378,7 +378,7 @@ class CompareDocs :
             df[f'{cls}:score'] = -2*np.log(df[f'{cls}:pval'])
             df[f'{cls}:Fisher'] = df[f'{cls}:score'].mean()
             df[f'{cls}:HC'], pth = HC(pv, stbl=stbl).HCstar(gamma=gamma)
-            df[f'{cls}:chisq'] = goodness_of_fit_tests.two_sample_chi_square(cnt1, cnt2)[0]
+            df[f'{cls}:chisq'] = two_sample_chi_square(cnt1, cnt2)[0]
             more = -np.sign(cnt1 - (cnt1 + cnt2) * p)
             thresh = pv < pth
             df[f'{cls}:affinity'] = more * thresh

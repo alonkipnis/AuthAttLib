@@ -85,16 +85,18 @@ class CompareDocs :
     """
     def __init__(self, **kwargs) :
         self.pval_type = kwargs.get('pval_type', 'multinom')
-        self.vocab = kwargs.get('vocabulary', [])
+        self.vocabulary = kwargs.get('vocabulary', [])
         self.max_features = kwargs.get('max_features', 3000)
-        self.min_cnt = kwargs.get('min_count', 1)
+        self.min_cnt = kwargs.get('min_cnt', 1)
         self.ng_range = kwargs.get('ngram_range', (1,1))
+        self.gamma = kwargs.get('gamma', .2)
+        self.stbl = kwargs.get('stbl', True) 
 
         self.counts_df = pd.DataFrame()
         self.num_of_cls = np.nan
         self.cls_names = []
         
-    def test_doc(self, doc, of_cls=None, stbl=True, gamma=.2) : 
+    def test_doc(self, doc, of_cls=None) : 
         """
         Test a new document against existing documents by combining
         binomial allocation P-values from each document. 
@@ -125,14 +127,14 @@ class CompareDocs :
             
             df[f'pval ({cls})'] = pv
             df[f'score ({cls})'] = -2*np.log(df[f'pval ({cls})'])
-            df[f'HC ({cls})'], pth = HC(pv, stbl=stbl).HCstar(gamma=gamma)
+            df[f'HC ({cls})'], pth = HC(pv, stbl=self.stbl).HCstar(gamma=self.gamma)
             more = -np.sign(cnt1 - (cnt1 + cnt2) * p)
             thresh = pv < pth
             df[f'affinity ({cls})'] = more * thresh
     
         return df
 
-    def naive_score_doc(self, doc, HCT='all', of_cls=None, stbl=True, gamma=.2) : 
+    def naive_score_doc(self, doc, HCT='all', of_cls=None) : 
         """
         Test a new document against existing data using a simple
         scoring algorithm based on feature affinity
@@ -144,10 +146,10 @@ class CompareDocs :
         logging.debug(f"Doc contains {dfi.n.sum()} terms.")
 
         if HCT == 'multinomial' :
-            df = self.HCT(gamma=gamma, stbl=stbl)
+            df = self.HCT(gamma=self.gamma, stbl=self.stbl)
             thresh = df['thresh']
         elif HCT == 'one_vs_many' :
-            df = self.HCT_vs_many(gamma=gamma, stbl=stbl)
+            df = self.HCT_vs_many(gamma=self.gamma, stbl=self.stbl)
         else :
             df = self.counts_df
             thresh = 1
@@ -190,7 +192,7 @@ class CompareDocs :
         """
         
         if type(text_data) == pd.DataFrame :
-            df_vocab = pd.DataFrame({'feature' : self.vocab})\
+            df_vocab = pd.DataFrame({'feature' : self.vocabulary})\
                          .set_index('feature')
             df = pd.DataFrame(text_data.feature.value_counts())\
                     .rename(columns={'feature' : 'n'})
@@ -200,12 +202,12 @@ class CompareDocs :
         pat = r"\b\w\w+\b|[Ia\.!?%\(\);,:\-\"\`]"
         #pat = r"\b\w\w+\b"
         # term counts
-        if len(self.vocab) == 0:
+        if len(self.vocabulary) == 0:
             tf_vectorizer = CountVectorizer(token_pattern=pat, 
                     max_features=self.max_features, ngram_range=self.ng_range)
         else:
             tf_vectorizer = CountVectorizer(token_pattern=pat,
-                    vocabulary=self.vocab, ngram_range=self.ng_range)
+                    vocabulary=self.vocabulary, ngram_range=self.ng_range)
             
         tf = tf_vectorizer.fit_transform([text_data])
         vocab = tf_vectorizer.get_feature_names()
@@ -218,7 +220,8 @@ class CompareDocs :
             
     def fit(self, data : Dict) :
         """
-        
+        Count items to populate confingency table
+        representing the model
 
         ARGS:
         -----
@@ -226,11 +229,11 @@ class CompareDocs :
 
         """
         df = pd.DataFrame()
-        if self.vocab == [] :
+        if self.vocabulary == [] :
             logging.error("You must provide a vocabulary.")
             raise ValueError
         
-        df['feature'] = self.vocab
+        df['feature'] = self.vocabulary
         df['n'] = 0
         df['T'] = 0
         df = df.set_index('feature')
@@ -280,16 +283,25 @@ class CompareDocs :
         df['pval'] = pv
         return df
 
-    def HCT(self, gamma=.2, stbl=True) :
+    def HCT(self, stbl=None, gamma=None) :
         """
         Apply HC threshold to fitted data and report features
         whose P-value falls below HC threshold
-
         """
         
+        if stbl :
+            this_stbl = stbl
+        else :
+            this_stbl = self.stbl
+
+        if gamma :
+            this_gamma = gamma
+        else :
+            this_gamma = self.gamma
+
         df = self.get_pvals()
 
-        hc, thr = HC(df['pval'], stbl=stbl).HCstar(gamma=gamma)
+        hc, thr = HC(df['pval'], stbl=this_stbl).HCstar(gamma=this_gamma)
         df['HC'] = hc
         df['thresh'] = df['pval'] < thr
         return df
@@ -303,7 +315,7 @@ class CompareDocs :
         pval_mat = poisson_test_two_sided_matrix(observed, expected)
         return pval_mat
 
-    def HC_Poiss(self, gamma=.2, stbl=True) :
+    def HC_Poiss(self) :
         """
         For each word, test wheather it is uniformly distributed 
         over documents. 
@@ -317,7 +329,7 @@ class CompareDocs :
         pval_min = pval_mat.min(0)
 
 
-    def test_cls_Poiss(self, cls_name, gamma=.2, stbl=True) :
+    def test_cls_Poiss(self, cls_name) :
         """
         HC Test of one class against the rest. Returns HC value 
         and indicates if feature is selected by HCT
@@ -333,13 +345,13 @@ class CompareDocs :
         df1['pval'] = binom_test_two_sided(df1[col_name_n],
                     df1[col_name_T], df1["frequency"]) # can appx by Poisson
 
-        hc, thr = HC(df1['pval'], stbl=stbl).HCstar(gamma=gamma)
+        hc, thr = HC(df1['pval'], stbl=self.stbl).HCstar(gamma=self.gamma)
         df1['HC'] = hc
         df1['thresh'] = df1['pval'] < thr
         df1['more'] = np.sign(df1[col_name_n] - df1[col_name_T]*df1["frequency"])
         return df1
 
-    def test_cls(self, cls_name, gamma=.2, stbl=True) :
+    def test_cls(self, cls_name) :
         """
         HC Test of one class against the rest. Returns HC value 
         and indicates if feature is selected by HCT
@@ -354,14 +366,14 @@ class CompareDocs :
 
         df1['pval'] = two_sample_pvals(df1[col_name_n], df1["n (rest)"])
 
-        hc, thr = HC(df1['pval'], stbl=stbl).HCstar(gamma=gamma)
+        hc, thr = HC(df1['pval'], stbl=self.stbl).HCstar(gamma=self.gamma)
         df1['HC'] = hc
         df1['thresh'] = df1['pval'] < thr
         df1['more'] = np.sign(df1[col_name_n] / df1[col_name_T] \
                                 - df1['n (rest)'] / df1['T (rest)'])
         return df1
 
-    def HCT_vs_many_Poiss(self, gamma=.2, stbl=True) :
+    def HCT_vs_many_Poiss(self) :
         """
         Apply HC threshold to fitted data in a 1-vs-many fashion
         based on many Poisson tests. Returns DataFrame with columns 
@@ -382,7 +394,7 @@ class CompareDocs :
         return dft.filter(like='affinity')
 
 
-    def HCT_vs_many(self, gamma=.2, stbl=True) :
+    def HCT_vs_many(self) :
         """
         Apply HC threshold to fitted data in a 1-vs-many fashion
         with many binomial tests. Returns DataFrame with columns 
@@ -407,7 +419,7 @@ class CompareDocs :
         Same as CompareDocs.HCT_vs_many, but only return
         features selected at least once
         """
-        dft = self.HCT_vs_many(gamma, stbl)
+        dft = self.HCT_vs_many()
         return dft[dft.iloc[:,dft.columns.str.contains('affinity')].abs().any(axis=1)]
 
     def classify_naive(self, doc, HCT="all", ret_stat=False) :

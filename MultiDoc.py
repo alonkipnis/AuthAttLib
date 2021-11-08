@@ -86,7 +86,7 @@ class CompareDocs :
         self.pval_type = kwargs.get('pval_type', 'multinom')
         self.vocabulary = kwargs.get('vocabulary', [])
         self.max_features = kwargs.get('max_features', 3000)
-        self.min_cnt = kwargs.get('min_cntt', 3)
+        self.min_cnt = kwargs.get('min_cnt', 3)
         self.ngram_range = kwargs.get('ngram_range', (1,1))
         self.measures = kwargs.get('measures', ['HC'])
         self.stbl = kwargs.get('stbl', True)

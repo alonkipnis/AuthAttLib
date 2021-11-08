@@ -166,6 +166,7 @@ class CompareDocs :
                      T_label(cls) : max(df[T_label(cls)])}
             df = df.fillna(value=values)
         
+        df = df[df['n'] >= self.min_cnt]
         self.num_of_cls = len(self.cls_names)
         
         self.counts_df = df

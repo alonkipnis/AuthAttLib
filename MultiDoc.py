@@ -92,15 +92,15 @@ class CompareDocs:
         self.pval_type = kwargs.get('pval_type', 'multinom')
         self.vocabulary = kwargs.get('vocabulary', [])
         self.max_features = kwargs.get('max_features', 3000)
-        self.min_cnt = kwargs.get('min_cnt', 3)
+        #self.min_cnt = kwargs.get('min_cnt', 3)
         self.ngram_range = kwargs.get('ngram_range', (1, 1))
-        self.measures = kwargs.get('measures', ['HC'])
         self.stbl = kwargs.get('stbl', True)
-        self.gamma = kwargs.get('gamma', .2)
+        self.gamma = kwargs.get('gamma', .25)
 
         self.counts_df = pd.DataFrame()
         self.num_of_cls = np.nan
         self.cls_names = []
+        self.measures=['HC', 'Fisher', 'chisq']
 
     def count_words(self, data):
         df = pd.DataFrame()
@@ -117,10 +117,10 @@ class CompareDocs:
         # term counts
         if len(self.vocabulary) == 0:
             tf_vectorizer = CountVectorizer(token_pattern=pat,
-                                            max_features=self.max_features, ngram_range=self.ngram_range)
+            max_features=self.max_features, ngram_range=self.ngram_range)
         else:
             tf_vectorizer = CountVectorizer(token_pattern=pat,
-                                            vocabulary=self.vocabulary, ngram_range=self.ngram_range)
+            vocabulary=self.vocabulary, ngram_range=self.ngram_range)
 
         tf = tf_vectorizer.fit_transform([data])
         vocab = tf_vectorizer.get_feature_names()
@@ -132,14 +132,12 @@ class CompareDocs:
 
     def fit(self, data):
         """
-        ARGS:
-        -----
-        data    :   dictionary. One entry per class. Values : string. 
+        Params:
+        :data:    dictionary. One entry per class. Values : string
         """
+
         df = pd.DataFrame()
-        if self.vocabulary == []:
-            logging.error("You must provide a vocabulary.")
-            raise ValueError
+        assert(len(self.vocabulary) > 0), "You must provide a vocabulary."
 
         df['feature'] = self.vocabulary
         df['n'] = 0
@@ -153,8 +151,8 @@ class CompareDocs:
             return f"{cls}:T"
 
         for cls in data:
-            assert (cls != 'tested')  # this name is reserved
-            assert (":" not in cls)  # colon symbol is reserved
+            assert (cls != 'tested'), "Cannot use `tested` as class name"
+            assert (":" not in cls), "Cannot use `:` inside a class name"
 
             self.cls_names += [cls]
             logging.debug(f"Processing {cls}...")
@@ -172,9 +170,9 @@ class CompareDocs:
                       T_label(cls): max(df[T_label(cls)])}
             df = df.fillna(value=values)
 
-        df = df[df['n'] >= self.min_cnt]
+        #df = df[df['n'] >= self.min_cnt]
+        assert (len(df) == len(self.vocabulary)), "ERROR: some features were ignored"
         self.num_of_cls = len(self.cls_names)
-
         self.counts_df = df
 
     def get_pvals(self):
@@ -354,22 +352,21 @@ class CompareDocs:
         Test a new document against existing documents by combining
         binomial allocation P-values from each document. 
         
-        Args:
-        doc     dataframe representing terms in the tested doc
-        of_cls  use this to indicate that the tested document is already
+        Params:
+        :doc:     dataframe representing terms in the tested doc
+        :of_cls:  use this to indicate that the tested document is already
                 represented by one of the classes in the model
-        stbl    type of HC statistic to use
-        gamma   parameter of HC statistic
-
+        :stbl:    type of HC statistic to use
+        :gamma:   parameter of HC statistic
         """
+
         stbl = kwrgs.get('stbl', self.stbl)
         gamma = kwrgs.get('gamma', self.gamma)
 
         dfi = self.count_words(doc)
-
         logging.debug(f"Doc contains {dfi.n.sum()} terms.")
-
         df = self.counts_df
+        assert(len(df) == len(dfi)), "count_words must use the same vocabulary"
 
         dfi['tested:T'] = dfi.n.sum()
         dfi = dfi.rename(columns={'n': 'tested:n'})
@@ -381,7 +378,7 @@ class CompareDocs:
             if of_cls == cls:  # if tested document is already represented in
                 # corpus, remove its counts to get a meaningful
                 # comparison.
-                logging.debug(f"Doc is of {of_cls}. Evaluating in Leave-out manner.")
+                logging.debug(f"Doc is of {of_cls}. Evaluating in a Leave-out manner.")
                 cnt2 -= cnt1
                 assert (np.all(cnt2 >= 0))
 

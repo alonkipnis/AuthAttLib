@@ -4,9 +4,13 @@ from scipy.stats import chisquare, poisson, binom
 import pandas as pd
 import numpy as np
 from scipy.special import binom as nkchoose
+from scipy.stats import f as fdist
 import scipy
+import warnings
 
-from TwoSampleHC import two_sample_pvals, HC, binom_test_two_sided
+from TwoSampleHC import two_sample_pvals
+from twosample import binom_test_two_sided, bin_allocation_test
+from hctest import HCtest
 from .goodness_of_fit_tests import two_sample_chi_square
 
 
@@ -49,36 +53,23 @@ def poisson_test_two_sided_matrix(x, lm):
 def poisson_test_two_sided(x, lm):
     pl = poisson.cdf(x, lm) * (x < lm) + poisson.sf(x, lm) * (x > lm) + (x == lm)
     pu = poisson.sf(poisson.isf(pl, lm), lm) * (x < lm) + poisson.sf(x, lm) * (x > lm)
-
-    # if x < lm :
-    #     assert((pl >= pu/2).all())
-    # if x > lm :
-    #     assert((pu >= pl/2).all())
-
     return pl + pu
 
 
-def binom_test_two_sided(x, n, p):
+def _sum_of_squares(scores) -> float:
     """
-    Returns:
-    --------
-    Prob( |Bin(n,p) - np| >= |x-np| )
-
-    Note: for small values of Prob there are differences
-    fron scipy.python.binom_test. It is unclear which one is 
-    more accurate.
+    Args:
+        :scores:   intra-class responses
     """
+    sum_squares = np.sum((scores - np.mean(scores)) ** 2)
+    return sum_squares
 
-    n = n.astype(int)
 
-    x_low = n * p - np.abs(x - n * p)
-    x_high = n * p + np.abs(x - n * p)
-
-    p_up = binom.cdf(x_low, n, p) \
-           + binom.sf(x_high - 1, n, p)
-
-    prob = np.minimum(p_up, 1)
-    return prob * (n != 0) + 1. * (n == 0)
+def Ftest(ss_num, ss_denom, dfn, dfd):
+    """
+    One-sided P-value of an F-test
+    """
+    return fdist.sf(ss_num, ss_denom, dfn, dfd)
 
 
 class CompareDocs:
@@ -92,7 +83,6 @@ class CompareDocs:
         self.pval_type = kwargs.get('pval_type', 'multinom')
         self.vocabulary = kwargs.get('vocabulary', [])
         self.max_features = kwargs.get('max_features', 3000)
-        #self.min_cnt = kwargs.get('min_cnt', 3)
         self.ngram_range = kwargs.get('ngram_range', (1, 1))
         self.stbl = kwargs.get('stbl', True)
         self.gamma = kwargs.get('gamma', .25)
@@ -100,7 +90,7 @@ class CompareDocs:
         self.counts_df = pd.DataFrame()
         self.num_of_cls = np.nan
         self.cls_names = []
-        self.measures=['HC', 'Fisher', 'chisq']
+        self.measures = ['HC', 'Fisher', 'chisq', 'majority']
 
     def count_words(self, data):
         df = pd.DataFrame()
@@ -117,10 +107,10 @@ class CompareDocs:
         # term counts
         if len(self.vocabulary) == 0:
             tf_vectorizer = CountVectorizer(token_pattern=pat,
-            max_features=self.max_features, ngram_range=self.ngram_range)
+                                            max_features=self.max_features, ngram_range=self.ngram_range)
         else:
             tf_vectorizer = CountVectorizer(token_pattern=pat,
-            vocabulary=self.vocabulary, ngram_range=self.ngram_range)
+                                            vocabulary=self.vocabulary, ngram_range=self.ngram_range)
 
         tf = tf_vectorizer.fit_transform([data])
         vocab = tf_vectorizer.get_feature_names()
@@ -132,12 +122,15 @@ class CompareDocs:
 
     def fit(self, data):
         """
+        Count words and populate contingency table of each class
+        Compute sum-of-squares
+
         Params:
         :data:    dictionary. One entry per class. Values : string
         """
 
         df = pd.DataFrame()
-        assert(len(self.vocabulary) > 0), "You must provide a vocabulary."
+        assert (len(self.vocabulary) > 0), "Vocabulary is empty."
 
         df['feature'] = self.vocabulary
         df['n'] = 0
@@ -150,9 +143,12 @@ class CompareDocs:
         def T_label(cls):
             return f"{cls}:T"
 
+        def S_label(cls):
+            return f"{cls}:SSq"
+
         for cls in data:
-            assert (cls != 'tested'), "Cannot use `tested` as class name"
-            assert (":" not in cls), "Cannot use `:` inside a class name"
+            assert (cls != 'tested'), "Cannot use `tested` as a class name"
+            assert (":" not in cls), "Cannot use `:` inside class names"
 
             self.cls_names += [cls]
             logging.debug(f"Processing {cls}...")
@@ -170,7 +166,6 @@ class CompareDocs:
                       T_label(cls): max(df[T_label(cls)])}
             df = df.fillna(value=values)
 
-        #df = df[df['n'] >= self.min_cnt]
         assert (len(df) == len(self.vocabulary)), "ERROR: some features were ignored"
         self.num_of_cls = len(self.cls_names)
         self.counts_df = df
@@ -189,37 +184,36 @@ class CompareDocs:
 
         else:  # num_cls == 2
             logging.info("Using binomial tests.")
-            pv = two_sample_pvals(df[f"{self.cls_names[0]}:n"],
-                                  df[f"{self.cls_names[1]}:n"])
+            pv = bin_allocation_test(df[f"{self.cls_names[0]}:n"],
+                                     df[f"{self.cls_names[1]}:n"])
 
         df['pval'] = pv
         return df
 
-    def HCT(self, **kwrgs):
+    def HCT(self, **kwargs):
         """
         Apply HC threshold to fitted data
         Report whether a feature is selected by HC threshold
 
         """
 
-        stbl = kwrgs.get('stbl', self.stbl)
-        gamma = kwrgs.get('gamma', self.gamma)
+        stbl = kwargs.get('stbl', self.stbl)
+        gamma = kwargs.get('gamma', self.gamma)
 
         df = self.get_pvals()
-
-        hc, thr = HC(df['pval'], stbl=stbl).HCstar(gamma=gamma)
+        hc, thr = HCtest(df['pval'], stbl=stbl).HCstar(gamma=gamma)
         df['HC'] = hc
         df['thresh'] = df['pval'] < thr
         return df
 
-    def test_cls_Poiss(self, cls_name, **kwrgs):
+    def test_cls_Poiss(self, cls_name, **kwargs):
         """
-        HC Test of one class against the rest. Returns HC value 
-        and indicates if feature is selected by HCT
+        HC Test of one class against the rest. Returns HC value
+        and indicates if feature is below HCT
 
         """
-        stbl = kwrgs.get('stbl', self.stbl)
-        gamma = kwrgs.get('gamma', self.gamma)
+        stbl = kwargs.get('stbl', self.stbl)
+        gamma = kwargs.get('gamma', self.gamma)
 
         df1 = pd.DataFrame()
         col_name_n = f"{cls_name}:n"
@@ -228,25 +222,24 @@ class CompareDocs:
         df1['frequency'] = self.counts_df['n'] / self.counts_df["T"]
         # observed feature frequency
 
-        df1['pval'] = binom_test_two_sided(df1[col_name_n],
-                                           df1[col_name_T], df1["frequency"])  # can appx by Poisson
+        df1['pval'] = poisson_test_two_sided(df1[col_name_n],
+                                             df1[col_name_T] * df1["frequency"])
 
-        hc, thr = HC(df1['pval'], stbl=stbl).HCstar(gamma=gamma)
+        hc, thr = HCtest(df1['pval'], stbl=stbl).HCstar(gamma=gamma)
         df1['HC'] = hc
         df1['thresh'] = df1['pval'] < thr
         df1['more'] = np.sign(df1[col_name_n] - df1[col_name_T] * df1["frequency"])
         return df1
 
-    def test_cls(self, cls_name, **kwrgs):
+    def test_cls(self, cls_name, **kwargs):
         """
         HC Test of one class against the rest. Returns HC value 
-        and indicates if feature is selected by HCT
+        and indicates if a feature is below HCT or not
 
         """
-        stbl = kwrgs.get('stbl', self.stbl)
-        gamma = kwrgs.get('gamma', self.gamma)
+        stbl = kwargs.get('stbl', self.stbl)
+        gamma = kwargs.get('gamma', self.gamma)
 
-        df1 = pd.DataFrame()
         col_name_n = f"{cls_name}:n"
         col_name_T = f"{cls_name}:T"
         df1 = self.counts_df.filter([col_name_n, col_name_T])
@@ -255,14 +248,14 @@ class CompareDocs:
 
         df1['pval'] = two_sample_pvals(df1[col_name_n], df1["rest:n"])
 
-        hc, thr = HC(df1['pval'], stbl=stbl).HCstar(gamma=gamma)
+        hc, thr = HCtest(df1['pval'], stbl=stbl).HCstar(gamma=gamma)
         df1['HC'] = hc
-        df1['thresh'] = df1['pval'] < thr
+        df1['thresh'] = df1['pval'] <= thr
         df1['more'] = np.sign(df1[col_name_n] / df1[col_name_T] \
                               - df1['rest:n'] / df1['rest:T'])
         return df1
 
-    def HCT_vs_many_Poiss(self, **kwrgs):
+    def HCT_vs_many_Poiss(self, **kwargs):
         """
         Apply HC threshold to fitted data in a 1-vs-many fashion
         with many Poisson tests. Returns DataFrame with columns 
@@ -274,18 +267,18 @@ class CompareDocs:
 
         """
 
-        stbl = kwrgs.get('stbl', self.stbl)
-        gamma = kwrgs.get('gamma', self.gamma)
+        stbl = kwargs.get('stbl', self.stbl)
+        gamma = kwargs.get('gamma', self.gamma)
 
         dft = self.counts_df
         for nm in self.cls_names:
             col_name = f'{nm}:affinity'
-            df = self.test_cls_Poiss(nm, stbl=stbl)
+            df = self.test_cls_Poiss(nm, stbl=stbl, gamma=gamma)
             df[col_name] = df['more'] * df['thresh']
             dft = dft.join(df[[col_name]])
         return dft.filter(like='affinity')
 
-    def HCT_vs_many(self, **kwrgs):
+    def HCT_vs_many(self, **kwargs):
         """
         Apply HC threshold to fitted data in a 1-vs-many fashion
         with many binomial tests. Returns DataFrame with columns 
@@ -296,61 +289,89 @@ class CompareDocs:
          0 : not selected
 
         """
-        stbl = kwrgs.get('stbl', self.stbl)
-        gamma = kwrgs.get('gamma', self.gamma)
+        stbl = kwargs.get('stbl', self.stbl)
+        gamma = kwargs.get('gamma', self.gamma)
+        ret_only_selected = kwargs.get('ret_only_selected', False)
+        save_mask = kwargs.get('save_mask', True)
 
         dft = self.counts_df
         for nm in self.cls_names:
             col_name = f'{nm}:affinity'
             col_name_pval = f'{nm}:pval'
-            df = self.test_cls(nm, stbl=stbl)
+            df = self.test_cls(nm, stbl=stbl, gamma=gamma)
             df[col_name] = df['more'] * df['thresh']
             df[col_name_pval] = df['pval']
             dft = dft.join(df[[col_name, col_name_pval]])
+            if save_mask:
+                self.counts_df[f'{nm}:mask'] = dft[f'{nm}:affinity'] != 0
+
+        if ret_only_selected:
+            dft = dft[dft.iloc[:,  # only use features selected at least once
+                      dft.columns.str.contains('affinity')].abs().any(axis=1)]
+
         return dft
 
-    def HCT_vs_many_filtered(self, **kwrgs):
+    def test_doc_mask(self, doc, of_cls=None, **kwargs):
 
-        """
-        Same as CompareDocs.HCT_vs_many, but only returns
-        features selected at least once
-        """
+        stbl = kwargs.get('stbl', self.stbl)
+        gamma = kwargs.get('gamma', self.gamma)
 
-        stbl = kwrgs.get('stbl', self.stbl)
-        gamma = kwrgs.get('gamma', self.gamma)
-        dft = self.HCT_vs_many(gamma=gamma, stbl=stbl)
+        dfi = self.count_words(doc)
+        logging.debug(f"Doc contains {dfi.n.sum()} terms.")
+        df = self.counts_df
+        assert (len(df) == len(dfi)), "count_words must use the same vocabulary"
 
-        # need to make sure that we filter those below threshold while
-        # still reporting Pvals
-        dft = dft[dft.iloc[:, # only use features selected at least once
-                  dft.columns.str.contains('affinity')].abs().any(axis=1)]
-        #return dft.iloc[:, dft.columns.str.contains(r'pval|affinity')]
-        return dft
-
-    def classify_naive(self, doc, HCT="all", ret_stat=False):
-        """
-        Receives a new document and a list of features.
-        Uses a simple classification rule.
-        """
-
-        df = self.test_doc(doc, HCT=HCT)
+        dfi['tested:T'] = dfi.n.sum()
+        dfi = dfi.rename(columns={'n': 'tested:n'})
+        df = df.join(dfi, how='left')
+        res = {}
 
         for cls in self.cls_names:
-            df[f'{cls}:naive_score'] = (df['tested:n'] > 0) * df[f'{cls}:affinity']
+            mask = df[f'{cls}:mask']
+            dfm = df.loc[mask, :]
+            logging.debug(f"Applying feature mask: using {len(dfm)} features")
 
-        scores = {}
-        for cls in self.cls_names:
-            scores[cls] = df.loc[:, f'{cls}:naive_score'].sum()
+            cnt1 = dfm['tested:n'].astype(int)
+            cnt2 = dfm[f'{cls}:n'].astype(int)
+            if of_cls == cls:  # if tested document is already represented in
+                # corpus, remove its counts to get a meaningful
+                # comparison.
+                logging.debug(f"Doc is of {of_cls}. Evaluating in a Leave-out manner.")
+                cnt2 -= cnt1
+                assert (np.all(cnt2 >= 0))
+                dfm.loc[:, f'{cls}:n'] = cnt2
+                dfm.loc[:, 'n'] -= cnt2
+                dfm.loc[:, 'T'] -= np.sum(cnt2)
 
-        if ret_stat:
-            return df
+            if cnt1.sum() + cnt2.sum() > 0:
+                pv, p = two_sample_pvals(cnt1, cnt2, ret_p=True)
+            else:
+                pv, p = cnt1 * np.nan, cnt1 * np.nan
 
-        return scores
+            dfm[f'{cls}:pval'] = pv
+            dfm[f'{cls}:score'] = -2 * np.log(dfm[f'{cls}:pval'])
+            obs = cnt1
+            ex = cnt2 * dfm['tested:T'] / dfm[f'{cls}:T']
+            dfm[f'{cls}:chisq'] = (obs - ex) ** 2 / ex
+            more = -np.sign(cnt1 - (cnt1 + cnt2) * p)
 
-    def test_doc(self, doc, of_cls=None, **kwrgs):
+            hc, pth = HCtest(pv, stbl=stbl).HCstar(gamma=gamma)
+            dfm[f'{cls}:affinity'] = more * (pv < pth)
+
+            fisher = dfm[f'{cls}:score'].mean()
+            chisq = two_sample_chi_square(cnt1, cnt2)[0]
+
+            res[cls] = {'df': dfm,
+                        'hc': hc,
+                        'fisher': fisher,
+                        'chisq': chisq
+                        }
+        return res
+
+    def test_doc(self, doc, of_cls=None, **kwargs):
         """
         Test a new document against existing documents by combining
-        binomial allocation P-values from each document. 
+        P-values from each document.
         
         Params:
         :doc:     dataframe representing terms in the tested doc
@@ -360,13 +381,15 @@ class CompareDocs:
         :gamma:   parameter of HC statistic
         """
 
-        stbl = kwrgs.get('stbl', self.stbl)
-        gamma = kwrgs.get('gamma', self.gamma)
+        stbl = kwargs.get('stbl', self.stbl)
+        gamma = kwargs.get('gamma', self.gamma)
 
         dfi = self.count_words(doc)
         logging.debug(f"Doc contains {dfi.n.sum()} terms.")
+
+        self.HCT_vs_many() # evaluate mask
         df = self.counts_df
-        assert(len(df) == len(dfi)), "count_words must use the same vocabulary"
+        assert (len(df) == len(dfi)), "count_words must use the same vocabulary"
 
         dfi['tested:T'] = dfi.n.sum()
         dfi = dfi.rename(columns={'n': 'tested:n'})
@@ -389,24 +412,29 @@ class CompareDocs:
 
             df[f'{cls}:pval'] = pv
             df[f'{cls}:score'] = -2 * np.log(df[f'{cls}:pval'])
-            df[f'{cls}:Fisher'] = df[f'{cls}:score'].mean()
-            df[f'{cls}:HC'], pth = HC(pv, stbl=stbl).HCstar(gamma=gamma)
+            df[f'{cls}:Fisher'] = df[f'{cls}:score'].mean()  # the mean of Fisher's method is equivalent
+            # to dividing score by number of Dof
+            df[f'{cls}:HC'], pth = HCtest(pv, stbl=stbl).HCstar(gamma=gamma)
             df[f'{cls}:chisq'] = two_sample_chi_square(cnt1, cnt2)[0]
             more = -np.sign(cnt1 - (cnt1 + cnt2) * p)
-            thresh = pv < pth
-            df[f'{cls}:affinity'] = more * thresh
+            mask = pv < pth
+            df[f'{cls}:affinity'] = more * mask
+
+            cls_mask = df[f'{cls}:mask']
+            sign = (2*(cnt1 / cnt1.sum() > df['n'] / df['T']) - 1)
+            df[f'{cls}:majority'] = -np.sum(sign * cls_mask) / np.sum(cls_mask)
 
         return df
 
     def naive_score_doc(self, doc, HCT='all',
-                        of_cls=None, **kwrgs):
+                        of_cls=None, **kwargs):
         """
         Test a new document against existing data using a simple
         scoring algorithm based on feature affinity
-
         """
-        stbl = kwrgs.get('stbl', self.stbl)
-        gamma = kwrgs.get('gamma', self.gamma)
+
+        stbl = kwargs.get('stbl', self.stbl)
+        gamma = kwargs.get('gamma', self.gamma)
 
         dfi = self.count_words(doc)
 
@@ -431,8 +459,7 @@ class CompareDocs:
             if of_cls == cls:  # if tested document is already represented in
                 # corpus, remove its counts to get a meaningful
                 # comparison.
-                logging.debug(f"Doc is of {of_cls}. Evaluating in Leave-our manner.")
-                print(f"Doc is of {of_cls}. Evaluating in Leave-our manner.")
+                logging.debug(f"Doc is of {of_cls}. Evaluating in Leave-out manner.")
                 cnt2 -= cnt1
 
             more = np.sign(cnt1 / cnt1.sum() - cnt2 / cnt2.sum())

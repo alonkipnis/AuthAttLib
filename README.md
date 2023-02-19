@@ -14,7 +14,7 @@ To use AuthorshipAttributionMulti and AuthorshipAttributionMultiBinary, arrange 
 
 See AuthorshipAttribution_example.ipynb for a use case in authorship attribution challenges. Here is the Binder link: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/alonkipnis/AuthorshipAttribution/master?filepath=Examples%2FAuthorshipAttribution_example.ipynb)
 
-This code was used to get the resutls and figures reported in [this](https://web.stanford.edu/~kipnisal/authorship.html) and in the paper:
+This code was used to get the results and figures reported in the paper:
 
 Alon Kipnis, ``[Higher Criticism for Discriminating Word-Frequency Tables and Testing Authorship](https://arxiv.org/abs/1911.01208)'', 2019
 

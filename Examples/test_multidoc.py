@@ -4,6 +4,7 @@
 import pandas as pd
 import logging
 import sys
+from sklearn.feature_extraction.text import CountVectorizer
 
 sys.path.append("../")
 from MultiDoc import CompareDocs
@@ -66,8 +67,7 @@ def build_model(data: pd.DataFrame,
     Args:
     -----
     data    doc_id|author|term
-    
-    TODO: can implement vocab reduction as part of the model
+
     """
 
     vocabulary = reduce_vocab(data, vocabulary, model_params)
@@ -76,8 +76,7 @@ def build_model(data: pd.DataFrame,
     return _build_model(data, vocab, model_params), vocabulary
 
 
-def filter_by_author(df: pd.DataFrame, lo_authors=[],
-                     lo_authors_to_merge=[]) -> pd.DataFrame:
+def filter_by_author(df: pd.DataFrame, lo_authors=[], lo_authors_to_merge=[]) -> pd.DataFrame:
     """
     Removes whatever author is not in lo_authors. 
     Overwrite adds doc_id info for whatever author in 
@@ -123,8 +122,7 @@ def model_predict(data_test: pd.DataFrame, model) -> pd.DataFrame:
     return df_eval
 
 
-def evaluate_accuracy(df: pd.DataFrame,
-                      report_params, parameters) -> pd.DataFrame:
+def evaluate_accuracy(df: pd.DataFrame, report_params, parameters) -> pd.DataFrame:
     def _eval_succ(df):
         df['wrt_author'] = df['variable'].str.extract(r'([^:]+):')
         idx_min = df.groupby(['doc_id', 'author'])['value'].idxmin()
@@ -152,14 +150,57 @@ model_params = dict(feat_reduction_method="none",  # options are: div_persuit, o
                     min_cnt=10)
 
 
-def main():
-    data = pd.read_csv("data_proc.csv")
-    vocab = pd.read_csv("vocabulary.csv")
 
-    data_filtered = filter_by_author(data, lo_authors=['Dtr', 'P', 'DtrH'])
-    md, _ = build_model(data_filtered, vocab, model_params)
-    df_eval = model_predict(data_filtered, md)
-    print(df_eval)
+def n_most_frequent_words_per_author(df, n, words_to_ignore=[], ngram_range=(1, 1)):
+    """
+        Return 'n' of the most frequent tokens in the corpus represented by the
+        list of strings 'texts'
+    """
+
+    pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
+
+    tf_vectorizer = CountVectorizer(stop_words=words_to_ignore, token_pattern=pat, ngram_range=ngram_range)
+
+    vocab = []
+    for auth in df.author.unique():
+        tf = tf_vectorizer.fit_transform(df[df.author == auth].text)
+        feature_names = np.array(tf_vectorizer.get_feature_names())
+
+        idcs = np.argsort(-tf.sum(0))
+        vocab += list(np.array(feature_names)[idcs][0][:n])
+
+    return list(set(vocab))
+
+
+
+def create_vocabulary(data, no_tokens, by_author):
+    assert ('author' in data.columns)
+    if by_author:
+        return n_most_frequent_words_per_author(data, no_tokens)
+    else:
+        return n_most_frequent_words_per_author(data, no_tokens)
+
+def main():
+    data = pd.read_csv("../Data/PAN2018_probs_1_to_4.csv")
+    # vocab = pd.read_csv("vocabulary.csv")
+    # data_filtered = filter_by_author(data, lo_authors=['Dtr', 'P', 'DtrH'])
+    # md, _ = build_model(data_filtered, vocab, model_params)
+    # df_eval = model_predict(data_filtered, md)
+    # print(df_eval)
+
+    for data_prob in data.groupby('prob'):
+        print(f"Solving problem {data_prob[0]}...")
+
+        data_train = data_prob[1][~data_prob[1]['doc_no'].str.contains('test_')]
+        data_test = data_prob[1][data_prob[1]['doc_no'].str.contains('test_')]
+
+        vocab = create_vocabulary(data_train, **vocab_params)
+        md = CompareDocs(vocabulary=vocab, **model_params)
+        md.fit(data_train)
+        model.test_doc(tested_doc, of_cls=auth)
+        md.predict(data_test)
+        print()
+
 
 
 if __name__ == '__main__':

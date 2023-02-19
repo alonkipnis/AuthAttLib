@@ -13,13 +13,13 @@ from sklearn.model_selection import KFold
 sys.path.append("../")
 from MultiDoc import CompareDocs
 
-
 pd.options.mode.chained_assignment = None
 
+
 def arrange_data(data):
-    #ds = data.rename(columns={'doc_no': 'doc_id'}).dropna()
+    # ds = data.rename(columns={'doc_no': 'doc_id'}).dropna()
     data.loc[:, 'doc_tested'] = data['doc_id']
-    data.loc[:, 'len'] = data['text'].apply(lambda x : len(x.split()))
+    data.loc[:, 'len'] = data['text'].apply(lambda x: len(x.split()))
     return data
 
 
@@ -119,15 +119,16 @@ def main():
         for doc in data_test.groupby('doc_id'):
             assert len(doc[1]) == 1
             r = model.predict(doc[1].text.values[0])
-            r1 = model.predict_proba(doc[1].text.values[0])
+            r1 = model.predict_proba(doc[1].text.values[0]) # similarity with respect to each class
             rec = pd.DataFrame(dict(problem=data_prob[0],
                                     author=doc[1].author,
                                     doc_id=doc[0],
                                     predicted_author=r,
-            ))
+                                    ))
             results = pd.concat([results, rec])
         acc = np.mean(results['author'] == results['predicted_author'])
         print(f"\tAccuracy = {acc}")
+
 
 if __name__ == '__main__':
     main()

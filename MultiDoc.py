@@ -88,7 +88,7 @@ class CompareDocs:
         self.counts_df = pd.DataFrame()
         self.num_of_cls = np.nan
         self.cls_names = []
-        self.measures = ['HC', 'Fisher', 'chisq', 'majority']
+        self.measures = ['HC', 'Fisher', 'chisq']
 
     def count_words(self, data):
         df = pd.DataFrame()
@@ -111,7 +111,7 @@ class CompareDocs:
                                             vocabulary=self.vocabulary, ngram_range=self.ngram_range)
 
         tf = tf_vectorizer.fit_transform([data])
-        vocab = tf_vectorizer.get_feature_names()
+        vocab = tf_vectorizer.get_feature_names_out()
         tc = np.array(tf.sum(0))[0].astype(int)
 
         df = pd.concat([df, pd.DataFrame({'feature': vocab, 'n': tc})]) \
@@ -383,7 +383,7 @@ class CompareDocs:
         logging.debug(f"Doc contains {dfi.n.sum()} terms.")
 
         self.HCT_vs_many() # evaluate mask
-        df = self.counts_df
+        df = self.counts_df.copy()
         assert (len(df) == len(dfi)), "count_words must use the same vocabulary"
 
         dfi['tested:T'] = dfi.n.sum()
@@ -415,11 +415,15 @@ class CompareDocs:
             mask = pv < pth
             df[f'{cls}:affinity'] = more * mask
 
-            cls_mask = df[f'{cls}:mask']
-            sign = (2*(cnt1 / cnt1.sum() > df['n'] / df['T']) - 1)
-            df[f'{cls}:majority'] = -np.sum(sign * cls_mask) / np.sum(cls_mask)
-
         return df
+
+    def predict_proba(self, doc: str, similarity_stats='HC'):
+        test_stat = self.test_doc(doc)
+        return test_stat.iloc[:, test_stat.columns.str.contains(similarity_stats)].mean()
+
+    def predict(self, doc: str, similarity_stats='HC') -> str:
+        r = self.predict_proba(doc, similarity_stats)
+        return r.idxmin().split(':')[0]
 
     def naive_score_doc(self, doc, HCT='all', of_cls=None, **kwargs):
         """

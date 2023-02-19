@@ -6,12 +6,11 @@ import numpy as np
 from scipy.special import binom as nkchoose
 from scipy.stats import f as fdist
 import scipy
-import warnings
 
 from TwoSampleHC import two_sample_pvals
-from twosample import binom_test_two_sided, bin_allocation_test
+from twosample import bin_allocation_test
 from hctest import HCtest
-from .goodness_of_fit_tests import two_sample_chi_square
+from goodness_of_fit_tests import two_sample_chi_square
 
 
 def n_label(cls):
@@ -25,7 +24,6 @@ def T_label(cls):
 def multinomial_test(x, p):  # slow
     import met
     assert (len(x) == len(p))
-    n_max = 20
     r_max = 1e6
     p = np.array(p) / np.sum(p)
     n = sum(x)
@@ -142,9 +140,6 @@ class CompareDocs:
 
         def T_label(cls):
             return f"{cls}:T"
-
-        def S_label(cls):
-            return f"{cls}:SSq"
 
         for cls in data:
             assert (cls != 'tested'), "Cannot use `tested` as a class name"
@@ -426,8 +421,7 @@ class CompareDocs:
 
         return df
 
-    def naive_score_doc(self, doc, HCT='all',
-                        of_cls=None, **kwargs):
+    def naive_score_doc(self, doc, HCT='all', of_cls=None, **kwargs):
         """
         Test a new document against existing data using a simple
         scoring algorithm based on feature affinity

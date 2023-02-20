@@ -1,10 +1,9 @@
-#supporting functions for AuthAttrLib
+#supporting functions for feature extraction and word counting
 import pandas as pd
 import numpy as np
-from tqdm import *
-import re
 from sklearn.feature_extraction.text import CountVectorizer
 from nltk import everygrams
+
 
 def extract_ngrams(df, ng_range = (1,1), by = ['author', 'doc_id'],
              pad_left = False) :
@@ -68,9 +67,7 @@ def change_vocab(dtm, old_vocab, new_vocab):
     return new_dtm
 
 
-def n_most_frequent_balanced(df, n, 
-            ngram_range = (1,1), words_to_ignore = []
-            ) :
+def n_most_frequent_balanced(df, n, ngram_range = (1,1), words_to_ignore = []):
     """
         Returns n of the most frequent tokens by each author 
         in the corpus represented by the dataframe df.
@@ -83,26 +80,13 @@ def n_most_frequent_balanced(df, n,
 
     import random
     df1 = pd.DataFrame(df.groupby('author').text.sum()).reset_index()
-    df1.loc[:,'len'] = df1.text.apply(lambda x : len(x.split()))
-    df1.loc[:,'min'] = df1.len.min()
-    df1.apply(lambda r : random.sample(
-        population=r['text'].split(),
-        k= r['min']),
-        axis = 1
-            )
+    df1.loc[:, 'len'] = df1.text.apply(lambda x : len(x.split()))
+    df1.loc[:, 'min'] = df1.len.min()
+    df1.apply(lambda r : random.sample(population=r['text'].split(), k = r['min']), axis = 1)
 
-    return n_most_frequent_words(
-        df1.text,
-        n=n,
-        ngram_range=ngram_range,
-        words_to_ignore=words_to_ignore
-                    )
+    return n_most_frequent_words(df1.text, n=n, ngram_range=ngram_range, words_to_ignore=words_to_ignore)
 
-def n_most_frequent_words_per_author(df, n, 
-                words_to_ignore=[],
-                ngram_range=(1, 1),
-                balanced=False
-                         ):
+def n_most_frequent_words_per_author(df, n, words_to_ignore=[], ngram_range=(1, 1)):
     """
         Return 'n' of the most frequent tokens in the corpus represented by the 
         list of strings 'texts'
@@ -126,35 +110,28 @@ def n_most_frequent_words_per_author(df, n,
     return list(set(vocab))
 
 
-def n_most_frequent_words(texts, n, 
-                words_to_ignore=[],
-                ngram_range=(1, 1),
-                balanced=False
-                         ):
+def n_most_frequent_words(texts, n, words_to_ignore=[], ngram_range=(1, 1),
+                          pattern=None):
     """
         Returns the 'n' most frequent tokens in the corpus represented by the 
         list of strings 'texts'
     """
 
-    pat = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
+    if pattern is None:
+        pattern = r"\b\w\w+\b|[a\.!?%\(\);,:\-\"\`]"
 
     tf_vectorizer = CountVectorizer(stop_words=words_to_ignore,
-                                    token_pattern=pat,
+                                    token_pattern=pattern,
                                     ngram_range=ngram_range)
     tf = tf_vectorizer.fit_transform(list(texts))
-    feature_names = np.array(tf_vectorizer.get_feature_names())
+    feature_names = np.array(tf_vectorizer.get_feature_names_out())
 
     idcs = np.argsort(-tf.sum(0))
     vocab_tf = np.array(feature_names)[idcs][0]
     return list(vocab_tf[:n])
 
 
-def frequent_words_tfidf(
-    texts,
-    no_words,
-    ngram_range=(1,1),
-    words_to_ignore=[]
-                        ):
+def frequent_words_tfidf(texts, no_words, ngram_range=(1,1), words_to_ignore=[]):
     """
         Returns no_words with LOWEST tf-idf score.
         Useful in removing proper names and rare words. 
@@ -166,7 +143,7 @@ def frequent_words_tfidf(
                                        sublinear_tf=True,
                                        stop_words=words_to_ignore)
     tfidf = tfidf_vectorizer.fit_transform(list(texts))
-    feature_names = tfidf_vectorizer.get_feature_names()
+    feature_names = tfidf_vectorizer.get_feature_names_out()
 
     idcs = np.argsort(tfidf.sum(0))
     vocab_tfidf = np.array(feature_names)[idcs][0]
@@ -188,7 +165,7 @@ def term_counts(text, vocab=[]):
     else:
         tf_vectorizer = CountVectorizer(token_pattern=pat, vocabulary=vocab)
     tf = tf_vectorizer.fit_transform([text])
-    vocab = tf_vectorizer.get_feature_names()
+    vocab = tf_vectorizer.get_feature_names_out()
     tc = np.array(tf.sum(0))[0]
 
     df = pd.concat([df, pd.DataFrame({'feature': vocab, 'n': tc})])
@@ -231,7 +208,7 @@ def to_docTermCounts(lo_texts, vocab=[], words_to_ignore=[],
                                         ngram_range=ngram_range)
 
     tf = tf_vectorizer.fit_transform(lo_texts)
-    feature_names = tf_vectorizer.get_feature_names()
+    feature_names = tf_vectorizer.get_feature_names_out()
 
     if as_dataframe :
         return pd.DataFrame(tf.todense(), columns = feature_names)

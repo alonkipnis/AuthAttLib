@@ -30,11 +30,8 @@ def HC_sim(c1, c2, gamma=0.15, randomize=False,
 
     if HCtype == 'HCstar':
         hc, _ = HC(pvals_red).HCstar(gamma=gamma)
-    elif HCtype == 'original':
-        hc, _ = HC(pvals_red).HC(gamma=gamma)
     else:
-        raise ValueError(f"{HCtype} is not a valid value for HCtype")
-        exit(1)
+        hc, _ = HC(pvals_red).HC(gamma=gamma)
     return hc
 
 

@@ -21,5 +21,4 @@ class HCsim(object):
 
     def documents_similarity(self, text1, text2):
         dfr = self.compare_docs(text1, text2)
-        print(dfr)
         return dfr.HC.values[0]

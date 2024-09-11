@@ -7,7 +7,7 @@ from sklearn.neighbors import NearestNeighbors
 import sys
 #sys.path.append('./TwoSampleHC')
 from TwoSampleHC import HC, binom_test_two_sided,\
-         two_sample_pvals, two_sample_test_df,\
+         two_sample_binomial_test, two_sample_test_df,\
          binom_var_test, binom_var_test_df
 from .goodness_of_fit_tests import *
 
@@ -87,12 +87,12 @@ class FreqTable(object):
 
         if pval_type == 'cell' :
             logging.debug('Computing cell P-values.')
-            pv_exact = two_sample_pvals(c1, c2, randomize=randomize)
+            pv_exact = two_sample_binomial_test(c1, c2, randomize=randomize)
             return pv_exact[c1 + c2 >= min_cnt]
 
         logging.debug('Computing cell and stripe P-values.')
         pv_bin_var = binom_var_test(c1, c2).values
-        pv_exact = two_sample_pvals(c1, c2, randomize=randomize)
+        pv_exact = two_sample_binomial_test(c1, c2, randomize=randomize)
         pv_exact = pv_exact[c1 + c2 >= min_cnt]
 
         pv_all = np.concatenate([pv_bin_var, pv_exact])
